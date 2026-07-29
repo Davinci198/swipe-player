@@ -51,33 +51,25 @@ jobs:
         run: |
           sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
 
-      - name: Setup Gradle (instalare directă)
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.5
-          validate_wrapper: false
-
-      - name: Kill any existing Gradle daemons
+      - name: Setup Gradle
         run: |
-          ./gradlew --stop || true
-          gradle --stop || true
-
-      - name: Configure gradle.properties
-        run: |
-          cat >> gradle.properties << 'EOF'
-          # Memory optimizations - 4GB RAM
-          org.gradle.jvmargs=-Xmx4g -Xms1g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
-          org.gradle.workers.max=1
-          org.gradle.daemon=false
-          org.gradle.parallel=false
-          org.gradle.caching=true
-          org.gradle.configureondemand=true
-          kotlin.daemon.jvmargs=-Xmx2g -Xms512m -XX:MaxMetaspaceSize=512m
-          android.enableJetifier=true
-          android.useAndroidX=true
+          # Instalare Gradle 8.5 direct, fără wrapper validation
+          GRADLE_VERSION=8.5
+          curl -sL -o /tmp/gradle-bin.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          unzip -q -o /tmp/gradle-bin.zip -d /opt
+          echo "/opt/gradle-${GRADLE_VERSION}/bin" >> $GITHUB_PATH
+          # Generăm wrapper properties pentru 8.5
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+          networkTimeout=10000
+          validateDistributionUrl=true
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
           EOF
-          echo "=== gradle.properties ==="
-          cat gradle.properties
+          echo "Gradle $GRADLE_VERSION installed"
+          gradle --version
 
       - name: Build APK
         env:
