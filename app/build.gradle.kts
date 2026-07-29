@@ -43,7 +43,7 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/dragonbones-release.aar"))
+    implementation(project(":dragonbones"))
     implementation("androidx.recyclerview:recyclerview:1.3.1")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     implementation("com.google.android.exoplayer:exoplayer:2.19.0")
