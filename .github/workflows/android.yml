@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       build_variant:
-        description: 'Build variant'
+        description: 'Variantă build'
         required: true
         default: 'debug'
         type: choice
@@ -26,7 +26,15 @@ jobs:
         with:
           fetch-depth: 1
 
-      # === SETUP SWAP SPACE ===
+      - name: List files after checkout
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "=== Files in root ==="
+          ls -la
+          echo "=== Gradle wrapper ==="
+          ls -la gradle/wrapper/ || echo "Wrapper folder not found"
+
+      # === SETUP SWAP SPACE (10GB) ===
       - name: Set up swap space (10GB)
         uses: pierotofy/set-swap-space@master
         with:
@@ -58,48 +66,37 @@ jobs:
           curl -L -o app/libs/dragonbones-release.aar \
             https://github.com/Davinci198/dragonbones-aar-prebuilt/releases/download/v1.0.0-ndk27-fix/dragonbones-release.aar
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.5
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
-      # === CONFIGURE GRADLE MEMORY ===
+      # === CONFIGURE GRADLE MEMORY (4GB) ===
       - name: Configure Gradle memory limits
         run: |
           cat >> gradle.properties << 'EOF'
-          # Memory optimizations
-          org.gradle.jvmargs=-Xmx3g -Xms512m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          # Memory optimizations - 4GB RAM
+          org.gradle.jvmargs=-Xmx4g -Xms1g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
           org.gradle.workers.max=2
           org.gradle.daemon=false
           org.gradle.parallel=false
           org.gradle.caching=true
           org.gradle.configureondemand=true
-          kotlin.daemon.jvmargs=-Xmx2g -Xms256m -XX:MaxMetaspaceSize=512m
+          kotlin.daemon.jvmargs=-Xmx2g -Xms512m -XX:MaxMetaspaceSize=512m
           android.enableJetifier=true
           android.useAndroidX=true
           EOF
           echo "=== gradle.properties ==="
           cat gradle.properties
 
-      # === BUILD ===
       - name: Build APK
-        id: build
         env:
           BUILD_VARIANT: ${{ inputs.build_variant }}
+          _JAVA_OPTIONS: "-Xmx4g"
         run: |
           set -euo pipefail
-          chmod +x ./gradlew
-          
           case "$BUILD_VARIANT" in
-            clone)
-              TASK=":app:assembleCloneDebug"
-              ;;
-            release)
-              TASK=":app:assembleRelease"
-              ;;
-            debug|*)
-              TASK=":app:assembleDebug"
-              ;;
+            clone) TASK=":app:assembleCloneDebug" ;;
+            release) TASK=":app:assembleRelease" ;;
+            debug|*) TASK=":app:assembleDebug" ;;
           esac
           
           echo "Running: $TASK"
@@ -109,8 +106,8 @@ jobs:
             --stacktrace \
             --no-daemon \
             --max-workers=2 \
-            -Dorg.gradle.jvmargs="-Xmx3g -Xms512m -XX:MaxMetaspaceSize=768m -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
-            -Dkotlin.daemon.jvmargs="-Xmx2g -Xms256m -XX:MaxMetaspaceSize=512m"
+            -Dorg.gradle.jvmargs="-Xmx4g -Xms1g -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
+            -Dkotlin.daemon.jvmargs="-Xmx2g -Xms512m -XX:MaxMetaspaceSize=512m"
           
           echo "=== Build finished at $(date) ==="
 
@@ -118,9 +115,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SwipePlayer-${{ inputs.build_variant }}-${{ github.run_number }}
-          path: |
-            app/build/outputs/apk/**/*.apk
-            app/build/outputs/bundle/**/*.aab
+          path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
 
