@@ -1,4 +1,4 @@
-name: Build APK
+Name: Build APK
 
 on:
   push:
@@ -90,7 +90,7 @@ jobs:
           GRADLE_OPTS: "-Xmx4g -Xms1g -XX:MaxMetaspaceSize=1g -Dorg.gradle.daemon=false"
         run: |
           set -euo pipefail
-          case "$BUILD_VARIANT" in
+          case "${BUILD_VARIANT:-debug}" in
             clone) TASK=":app:assembleCloneDebug" ;;
             release) TASK=":app:assembleRelease" ;;
             debug|*) TASK=":app:assembleDebug" ;;
@@ -111,7 +111,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SwipePlayer-${{ inputs.build_variant }}-${{ github.run_number }}
+          name: SwipePlayer-${{ inputs.build_variant || 'debug' }}-${{ github.run_number }}
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
@@ -122,7 +122,8 @@ jobs:
         with:
           name: gradle-logs-${{ github.run_number }}
           path: |
-            **/.gradle/worker-*/**/*.log
-            **/build/reports/**
-            **/build/outputs/logs/**
+            **/build/reports/
+            **/build/outputs/logs/
+            **/build/test-results/
+            **/*.log
           retention-days: 3
