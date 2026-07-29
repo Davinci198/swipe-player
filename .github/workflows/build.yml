@@ -1,98 +1,54 @@
-name: Build SwipePlayer APK
+name: Build SwipePlayerApp + DragonBones APK (Fixed)
 
 on:
-  workflow_dispatch:
-    inputs:
-      gradle_task:
-        description: Gradle task
-        required: true
-        default: assembleCloneDebug
-        type: choice
-        options:
-          - assembleCloneDebug
-          - assembleDebug
-          - assembleRelease
   push:
-    branches: [main]
-    paths:
-      - .github/workflows/**
-      - app/**
-      - build.gradle.kts
-      - settings.gradle.kts
-      - gradle.properties
-      - gradle/wrapper/**
-
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
-env:
-  JAVA_VERSION: '21'
-  ANDROID_NDK_VERSION: '27.0.12077973'
-  ANDROID_CMAKE_VERSION: '3.22.1'
-  GRADLE_VERSION: '8.13'
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build APK
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          tool-cache: false
-          android: false
-          dotnet: true
-          large-packages: true
-          docker-images: true
+          distribution: 'temurin'
+          java-version: '17'
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - uses: android-actions/setup-android@v4
-
-      - name: Install NDK + CMake
-        shell: bash
+      - name: Download DragonBones AAR (NDK27 Fix)
         run: |
-          sdkmanager --install \
-            "platforms;android-36" \
-            "platforms;android-34" \
-            "build-tools;35.0.0" \
-            "ndk;$ANDROID_NDK_VERSION" \
-            "cmake;$ANDROID_CMAKE_VERSION"
+          mkdir -p app/libs
+          curl -L -o app/libs/dragonbones-release.aar https://github.com/Davinci198/dragonbones-aar-prebuilt/releases/download/v1.0.0-ndk27-fix/dragonbones-release.aar
+          ls -lh app/libs/
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Build APK
-        id: gradle-build
-        timeout-minutes: 45
-        shell: bash
+      - name: Fix settings.gradle.kts - remove :dragonbones
         run: |
-          chmod +x ./gradlew
-          ./gradlew ${{ github.event.inputs.gradle_task || 'assembleCloneDebug' }} \
-            --no-daemon --max-workers=2 2>&1 | tee gradle.log
-          echo "=== BUILD COMPLETED ==="
-          grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build finished with warnings"
+          sed -i '/include.*dragonbones/d' settings.gradle.kts 2>/dev/null || true
+          sed -i '/include.*dragonbones/d' settings.gradle 2>/dev/null || true
+          cat settings.gradle.kts || cat settings.gradle
+
+      - name: Fix app/build.gradle.kts - use AAR
+        run: |
+          if grep -q "project.*:dragonbones" app/build.gradle.kts; then
+            sed -i 's|implementation(project.*:dragonbones.*)|implementation(files("libs/dragonbones-release.aar"))|g' app/build.gradle.kts
+          fi
+          cat app/build.gradle.kts | head -n 100
+
+      - name: Setup Gradle 8.5
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.5
+
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SwipePlayer-APK-${{ github.run_number }}
-          path: app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-          retention-days: 14
+          name: SwipePlayerApp-APK-Fixed
+          path: app/build/outputs/apk/debug/app-debug.apk
