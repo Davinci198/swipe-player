@@ -1,29 +1,18 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("com.android.application") version "8.2.2"
+    id("org.jetbrains.kotlin.android") version "1.9.22"
 }
 
 android {
     namespace = "com.swipeplayer"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.swipeplayer.app"
         minSdk = 26
-        targetSdk = 33
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
-
-        ndk {
-            abiFilters += setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 
     buildTypes {
@@ -62,28 +51,5 @@ dependencies {
     implementation("com.google.android.material:material:1.9.0")
 }
 
-// Download prebuilt AAR from dragonbones-aar-prebuilt repo if missing
-val dragonBonesAarUrl = "https://raw.githubusercontent.com/Davinci198/dragonbones-aar-prebuilt/main/dragonbones-release.aar"
-val aarFile = file("libs/dragonbones-release.aar")
-
-tasks.register("downloadDragonBonesAar") {
-    doLast {
-        if (!aarFile.exists()) {
-            aarFile.parentFile.mkdirs()
-            println("Downloading DragonBones AAR from $dragonBonesAarUrl")
-            java.net.URL(dragonBonesAarUrl).openStream().use { input ->
-                aarFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            println("Downloaded dragonbones-release.aar to ${aarFile.path}")
-        } else {
-            println("dragonbones-release.aar already exists at ${aarFile.path}")
-        }
-    }
-}
-
-// Ensure download runs before build
-tasks.named("preBuild") {
-    dependsOn("downloadDragonBonesAar")
-}
+// DragonBones AAR pre-descărcat manual în app/libs/
+// Task-ul de download a fost eliminat - AAR-ul se află deja în libs/
