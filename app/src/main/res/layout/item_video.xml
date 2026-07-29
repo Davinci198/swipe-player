@@ -10,4 +10,37 @@
         android:use_controller="false"
         android:background="@android:color/black" />
 
+    <!-- Overlay nume video + favorite -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_gravity="top"
+        android:padding="16dp"
+        android:paddingTop="max(16dp, 32dp)"
+        android:background="@android:color/transparent">
+
+        <TextView
+            android:id="@+id/tvVideoName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#EEFFFFFF"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnFavorite"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/star_off"
+            android:contentDescription="Favorite"
+            android:scaleType="centerInside"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
 </FrameLayout>
