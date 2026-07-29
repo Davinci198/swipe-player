@@ -51,16 +51,11 @@ jobs:
         run: |
           sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
 
-      - name: Download DragonBones AAR
-        run: |
-          mkdir -p app/libs
-          curl -L -o app/libs/dragonbones-release.aar \
-            https://github.com/Davinci198/dragonbones-aar-prebuilt/releases/download/v1.0.0-ndk27-fix/dragonbones-release.aar
-
       - name: Setup Gradle (instalare directă)
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.5
+          validate_wrapper: false
 
       - name: Kill any existing Gradle daemons
         run: |
