@@ -1,4 +1,4 @@
-name: Build SwipePlayerApp + DragonBones APK (Fixed)
+name: Build APK
 
 on:
   push:
@@ -20,35 +20,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Download DragonBones AAR (NDK27 Fix)
+      - name: Download DragonBones AAR
         run: |
           mkdir -p app/libs
           curl -L -o app/libs/dragonbones-release.aar https://github.com/Davinci198/dragonbones-aar-prebuilt/releases/download/v1.0.0-ndk27-fix/dragonbones-release.aar
-          ls -lh app/libs/
 
-      - name: Fix settings.gradle.kts - remove :dragonbones
-        run: |
-          sed -i '/include.*dragonbones/d' settings.gradle.kts 2>/dev/null || true
-          sed -i '/include.*dragonbones/d' settings.gradle 2>/dev/null || true
-          cat settings.gradle.kts || cat settings.gradle
-
-      - name: Fix app/build.gradle.kts - use AAR
-        run: |
-          if grep -q "project.*:dragonbones" app/build.gradle.kts; then
-            sed -i 's|implementation(project.*:dragonbones.*)|implementation(files("libs/dragonbones-release.aar"))|g' app/build.gradle.kts
-          fi
-          cat app/build.gradle.kts | head -n 100
-
-      - name: Setup Gradle 8.5
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.5
 
-      - name: Build Debug APK
+      - name: Build with Gradle
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SwipePlayerApp-APK-Fixed
+          name: SwipePlayerApp-APK
           path: app/build/outputs/apk/debug/app-debug.apk
