@@ -61,3 +61,29 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
 }
+
+// Download prebuilt AAR from dragonbones-aar-prebuilt repo if missing
+val dragonBonesAarUrl = "https://raw.githubusercontent.com/Davinci198/dragonbones-aar-prebuilt/main/dragonbones-release.aar"
+val aarFile = file("libs/dragonbones-release.aar")
+
+tasks.register("downloadDragonBonesAar") {
+    doLast {
+        if (!aarFile.exists()) {
+            aarFile.parentFile.mkdirs()
+            println("Downloading DragonBones AAR from $dragonBonesAarUrl")
+            java.net.URL(dragonBonesAarUrl).openStream().use { input ->
+                aarFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            println("Downloaded dragonbones-release.aar to ${aarFile.path}")
+        } else {
+            println("dragonbones-release.aar already exists at ${aarFile.path}")
+        }
+    }
+}
+
+// Ensure download runs before build
+tasks.named("preBuild") {
+    dependsOn("downloadDragonBonesAar")
+}
