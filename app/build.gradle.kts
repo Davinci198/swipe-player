@@ -2,11 +2,9 @@ plugins {
     id("com.android.application") version "8.2.2"
     id("org.jetbrains.kotlin.android") version "1.9.22"
 }
-
 android {
     namespace = "com.swipe.player"
     compileSdk = 34
-
     defaultConfig {
         applicationId = "com.swipe.player"
         minSdk = 26
@@ -14,7 +12,6 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
-
     flavorDimensions += "default"
     productFlavors {
         create("main") {
@@ -29,7 +26,6 @@ android {
             versionNameSuffix = "-clone"
         }
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -39,23 +35,14 @@ android {
             isDebuggable = true
         }
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-
     kotlinOptions {
         jvmTarget = "1.8"
     }
-
-    sourceSets {
-        getByName("main") {
-            assets.srcDirs("src/main/assets")
-        }
-    }
 }
-
 dependencies {
     implementation(project(":dragonbones"))
     implementation("androidx.recyclerview:recyclerview:1.3.1")
@@ -67,5 +54,3 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
 }
-
-// DragonBones AAR pre-built in app/libs/
