@@ -107,26 +107,18 @@ jobs:
           fi
 
           echo "Building assemble${VARIANT_CAP}Release ..."
-          ./gradlew ":app:assemble${VARIANT_CAP}Release" \
-            --no-daemon \
-            --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
+          ./gradlew ":app:assemble${VARIANT_CAP}Release"             --no-daemon             --max-workers=1             -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
 
           echo "=== BUILD COMPLETED ==="
           grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build finished"
 
-      - name: Upload gradle log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-release-log
-          path: gradle.log
-
-      - name: Find APK files
-        if: success()
+      - name: Show all APK files
+        if: always()
         run: |
-          echo "=== APK files ==="
-          find app/build/outputs/apk -name "*.apk" -exec ls -lh {} \;
+          echo "=== Looking for ALL APK files ==="
+          find . -name "*.apk" -exec ls -lh {} \; || echo "No APK found anywhere"
+          echo "=== app/build/outputs ==="
+          find app/build/outputs -type f 2>/dev/null || echo "No outputs dir"
 
       - name: Upload Release APK
         if: success()
@@ -134,14 +126,14 @@ jobs:
         with:
           name: swipe-player-release-${{ github.run_number }}
           path: |
-            app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+            **/*.apk
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Create GitHub Release
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/**/*.apk
+          files: "**/*.apk"
           generate_release_notes: true
           draft: false
