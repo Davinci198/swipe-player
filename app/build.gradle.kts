@@ -46,7 +46,10 @@ dependencies {
     implementation(project(":dragonbones"))
     implementation("androidx.recyclerview:recyclerview:1.3.1")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
-    implementation("com.google.android.exoplayer:exoplayer:2.19.0")
+    // Media3 (înlocuiește ExoPlayer)
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-common:1.3.1")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
 }
