@@ -60,7 +60,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 1
 
       - name: Free disk space
@@ -91,19 +90,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Initialize terminal submodule
-        shell: bash
-        run: |
-          set -euo pipefail
-          git submodule sync -- terminal
-          git submodule update --init --recursive --depth 1 terminal
-          git submodule status -- terminal
-
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v2
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
