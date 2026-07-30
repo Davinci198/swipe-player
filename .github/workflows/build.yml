@@ -29,7 +29,7 @@ concurrency:
 permissions:
   contents: read
 env:
-  JAVA_VERSION: '21'
+  JAVA_VERSION: '17'
   _JAVA_OPTIONS: '-Xmx4g'
 jobs:
   build:
@@ -66,43 +66,13 @@ jobs:
         uses: gradle/wrapper-validation-action@v2
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle + CMake NDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            app/.cxx
-            **/.cxx
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Setup NDK r27 + CMake
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r27
-          link-to-sdk: true
-
-      - name: Install Platforms and Build-Tools
-        shell: bash
+      - name: Install NDK and CMake
         run: |
-          set -euo pipefail
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/android-sdk-cmdline-tools/latest/bin/sdkmanager"
-          fi
-          echo "Using SDKMANAGER: $SDKMANAGER"
-          yes | "$SDKMANAGER" --install \
-            'platforms;android-34' \
-            'platforms;android-36' \
-            'build-tools;34.0.0' \
-            'build-tools;35.0.0'
-          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
-          echo "NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
+          sdkmanager --install 'ndk;27.0.12077973' 'cmake;3.22.1'
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "NDK_ROOT=$ANDROID_NDK_HOME" >> $GITHUB_ENV
 
       - name: Set up swap
         uses: pierotofy/set-swap-space@master
