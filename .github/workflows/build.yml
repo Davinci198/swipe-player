@@ -32,7 +32,6 @@ env:
   JAVA_VERSION: '21'
   ANDROID_NDK_VERSION: '27.0.12077973'
   ANDROID_CMAKE_VERSION: '3.22.1'
-  GRADLE_VERSION: '8.5'
   _JAVA_OPTIONS: '-Xmx4g'
 jobs:
   build:
@@ -83,12 +82,11 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Install Android SDK, NDK and CMake
+      - name: Install NDK and CMake
         shell: bash
         run: |
           set -euo pipefail
           sdkmanager --install \
-            'platform-tools' \
             'platforms;android-34' \
             'platforms;android-36' \
             'build-tools;34.0.0' \
