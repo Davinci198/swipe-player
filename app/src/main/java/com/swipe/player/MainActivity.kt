@@ -39,8 +39,8 @@ class MainActivity : AppCompatActivity() {
         viewPager.adapter = VideoPagerAdapter(this, videos)
 
         // Init native DragonBones bridge
-        val ok = DragonBonesBridge.init()
-        val version = DragonBonesBridge.getVersion()
+        val ok = try { DragonBonesBridge.init() } catch (e: UnsatisfiedLinkError) { Log.w(TAG, "DragonBones native not available"); false }
+        val version = try { DragonBonesBridge.getVersion() } catch (e: UnsatisfiedLinkError) { "N/A" }
 
         // Statistici memorie
         val stats = memoryManager.getStatistici()
