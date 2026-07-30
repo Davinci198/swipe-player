@@ -37,7 +37,6 @@ android {
     sourceSets {
         getByName("main") {
             assets.srcDirs("src/main/assets")
-            jniLibs.srcDirs("libs") // .aar native libs will be picked from libs/
         }
     }
 }

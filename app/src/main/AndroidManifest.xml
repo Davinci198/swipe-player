@@ -11,6 +11,7 @@
         android:label="Swipe Player"
         android:supportsRtl="true"
         android:theme="@style/Theme.SwipePlayer">
+        android:icon="@mipmap/ic_launcher"
 
         <activity
             android:name="com.swipeplayer.MainActivity"
