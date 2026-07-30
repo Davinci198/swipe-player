@@ -43,7 +43,7 @@ android {
     }
 }
 kotlin {
-    jvmToolchain(1.8)
+    jvmToolchain(8)
 }
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
