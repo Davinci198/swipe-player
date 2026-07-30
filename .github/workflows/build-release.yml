@@ -107,18 +107,60 @@ jobs:
           fi
 
           echo "Building assemble${VARIANT_CAP}Release ..."
-          ./gradlew ":app:assemble${VARIANT_CAP}Release"             --no-daemon             --max-workers=1             -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
+          ./gradlew ":app:assemble${VARIANT_CAP}Release" \
+            --no-daemon \
+            --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
 
           echo "=== BUILD COMPLETED ==="
           grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build finished"
 
+      - name: Sign APK
+        if: success()
+        run: |
+          echo "=== Signing APK ==="
+          # Decode keystore from secrets
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
+
+          # Find the unsigned APK
+          UNSIGNED_APK=$(find app/build/outputs/apk -name "*-unsigned.apk" | head -1)
+          if [ -z "$UNSIGNED_APK" ]; then
+            echo "No unsigned APK found, trying all APKs..."
+            UNSIGNED_APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          fi
+
+          if [ -z "$UNSIGNED_APK" ]; then
+            echo "ERROR: No APK found to sign!"
+            find . -name "*.apk" -exec ls -lh {} \;
+            exit 1
+          fi
+
+          echo "Found APK: $UNSIGNED_APK"
+          ls -lh "$UNSIGNED_APK"
+
+          # Determine output name
+          BASENAME=$(basename "$UNSIGNED_APK")
+          SIGNED_APK="app/build/outputs/apk/$(echo $BASENAME | sed 's/-unsigned//g')"
+
+          # Use apksigner to sign
+          ${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -1)/apksigner sign \
+            --ks /tmp/release.keystore \
+            --ks-key-alias ${{ secrets.RELEASE_KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.RELEASE_STORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.RELEASE_KEY_PASSWORD }} \
+            --out "$SIGNED_APK" \
+            "$UNSIGNED_APK"
+
+          echo "=== Verifying signature ==="
+          ${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -1)/apksigner verify "$SIGNED_APK"
+          echo "✅ APK signed successfully!"
+          ls -lh "$SIGNED_APK"
+
       - name: Show all APK files
         if: always()
         run: |
-          echo "=== Looking for ALL APK files ==="
-          find . -name "*.apk" -exec ls -lh {} \; || echo "No APK found anywhere"
-          echo "=== app/build/outputs ==="
-          find app/build/outputs -type f 2>/dev/null || echo "No outputs dir"
+          echo "=== All APK files ==="
+          find . -name "*.apk" -exec ls -lh {} \; || echo "No APK found"
 
       - name: Upload Release APK
         if: success()
