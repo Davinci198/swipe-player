@@ -11,7 +11,7 @@
         android:theme="@style/Theme.SwipePlayer"
         android:icon="@mipmap/ic_launcher">
         <activity
-            android:name="com.swipe.player.app.MainActivity"
+            android:name="com.swipe.player.MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
