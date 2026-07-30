@@ -1,0 +1,147 @@
+name: Release APK Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_variant:
+        description: "Build variant"
+        required: true
+        default: "original"
+        type: choice
+        options:
+          - "original"
+          - "clone"
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  JAVA_VERSION: "17"
+  _JAVA_OPTIONS: "-Xmx4g"
+
+jobs:
+  release:
+    name: Build Release APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Show free space
+        run: df -h
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: |
+          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "NDK_ROOT=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+
+      - name: Set up swap
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Configure Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Determine build variant
+        id: variant
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VARIANT="${{ inputs.build_variant }}"
+          else
+            VARIANT="original"
+          fi
+          echo "variant=$VARIANT" >> $GITHUB_OUTPUT
+          echo "Building: $VARIANT release"
+
+      - name: Build Release APK
+        id: gradle-build
+        timeout-minutes: 120
+        shell: bash
+        env:
+          _JAVA_OPTIONS: "-Xmx4g"
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+
+          VARIANT_CAP="Original"
+          if [ "${{ steps.variant.outputs.variant }}" = "clone" ]; then
+            VARIANT_CAP="Clone"
+          fi
+
+          echo "Building assemble${VARIANT_CAP}Release ..."
+          ./gradlew ":app:assemble${VARIANT_CAP}Release" \
+            --no-daemon \
+            --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
+
+          echo "=== BUILD COMPLETED ==="
+          grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build finished"
+
+      - name: Upload gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-release-log
+          path: gradle.log
+
+      - name: Find APK files
+        if: success()
+        run: |
+          echo "=== APK files ==="
+          find app/build/outputs/apk -name "*.apk" -exec ls -lh {} \;
+
+      - name: Upload Release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swipe-player-release-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: success() && startsWith(github.ref, "refs/tags/v")
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/**/*.apk
+          generate_release_notes: true
+          draft: false
