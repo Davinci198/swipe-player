@@ -5,10 +5,10 @@ on:
       gradle_task:
         description: Gradle task to run
         required: true
-        default: ':app:assembleMainDebug'
+        default: ':app:assembleOriginalDebug'
         type: choice
         options:
-          - ':app:assembleMainDebug'
+          - ':app:assembleOriginalDebug'
           - ':app:assembleCloneDebug'
           - ':app:assembleRelease'
           - ':app:bundleRelease'
@@ -91,7 +91,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "task=${{ inputs.gradle_task }}" >> $GITHUB_OUTPUT
           else
-            echo "task=:app:assembleMainDebug" >> $GITHUB_OUTPUT
+            echo "task=:app:assembleOriginalDebug" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Android APK
