@@ -140,12 +140,15 @@ jobs:
           key: android-full-deps-${{ runner.os }}-${{ hashFiles('ci/script/download_android_dependencies.sh', 'ci/script/prepare_android_dependencies.py') }}
 
       - name: Download Android dependencies
-        if: false
-        run: echo "Skipped - no ci/script directory"
+        if: steps.cache-manual-deps.outputs.cache-hit != 'true'
+        run: bash ci/script/download_android_dependencies.sh full "manual-deps"
 
       - name: Prepare Android dependencies
-        if: false
-        run: echo "Skipped - no ci/script directory"
+        run: |
+          python3 ci/script/prepare_android_dependencies.py \
+            --profile full \
+            --archives "manual-deps" \
+            --repository "$GITHUB_WORKSPACE"
 
       - name: Install JavaScript dependencies
         if: false
