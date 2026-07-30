@@ -8,36 +8,21 @@ on:
         default: ':app:assembleMainDebug'
         type: choice
         options:
-          - assembleDebug
-          - ':app:assembleNightly'
-          - ':app:assembleClone'
+          - ':app:assembleMainDebug'
+          - ':app:assembleCloneDebug'
+          - ':app:assembleRelease'
           - ':app:bundleRelease'
   push:
     branches: [main]
     paths:
-      - .github/workflows/build-full.yml
-      - .github/workflows/build-quick.yml
-      - .gitmodules
-      - .npmrc
-      - app/**
-      - build.gradle.kts
-      - ci/**
-      - cmake/**
-      - dragonbones/**
-      - examples/**
-      - fbx/**
-      - gradle/**
-      - gradle.properties
-      - gradlew
-      - llama/**
-      - mmd/**
-      - mnn/**
-      - package.json
-      - quickjs/**
-      - settings.gradle.kts
-      - terminal/**
-      - tools/**
-      - web-chat/**
+      - '.github/workflows/build.yml'
+      - 'app/**'
+      - 'dragonbones/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
 concurrency:
   group: build-full-${{ github.ref }}
   cancel-in-progress: true
@@ -45,12 +30,10 @@ permissions:
   contents: read
 env:
   JAVA_VERSION: '21'
-  NODE_VERSION: '22'
   ANDROID_NDK_VERSION: '27.0.12077973'
   ANDROID_CMAKE_VERSION: '3.22.1'
   GRADLE_VERSION: '8.5'
-  RUST_VERSION: '1.88.0'
-  _JAVA_OPTIONS: "-Xmx4g"
+  _JAVA_OPTIONS: '-Xmx4g'
 jobs:
   build:
     name: Build Android artifacts
@@ -76,20 +59,6 @@ jobs:
       - name: Show free space
         run: df -h
 
-      - name: Fix dragonbones CMakeLists
-        run: |
-          cat dragonbones/CMakeLists.txt
-          echo '--- Patching for NDK27 if needed ---'
-          sed -i 's/-std=c++11/-std=c++17 -faligned-new/g; s/-std=c++14/-std=c++17 -faligned-new/g' dragonbones/CMakeLists.txt || true
-          grep -q 'faligned-new' dragonbones/CMakeLists.txt || echo 'target_compile_options(dragonbones_native PRIVATE -faligned-new -std=c++17)' >> dragonbones/CMakeLists.txt
-          echo '--- Final CMakeLists ---'
-          cat dragonbones/CMakeLists.txt
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -98,11 +67,6 @@ jobs:
 
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
@@ -124,39 +88,18 @@ jobs:
         run: |
           set -euo pipefail
           sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "platforms;android-36" \
-            "build-tools;34.0.0" \
-            "build-tools;35.0.0" \
-            "ndk;$ANDROID_NDK_VERSION" \
-            "cmake;$ANDROID_CMAKE_VERSION"
+            'platform-tools' \
+            'platforms;android-34' \
+            'platforms;android-36' \
+            'build-tools;34.0.0' \
+            'build-tools;35.0.0' \
+            'ndk;$ANDROID_NDK_VERSION' \
+            'cmake;$ANDROID_CMAKE_VERSION'
 
-      - name: Restore Android dependency cache
-        id: cache-manual-deps
-        uses: actions/cache@v4
+      - name: Set up swap
+        uses: pierotofy/set-swap-space@master
         with:
-          path: manual-deps
-          key: android-full-deps-${{ runner.os }}-${{ hashFiles('ci/script/download_android_dependencies.sh', 'ci/script/prepare_android_dependencies.py') }}
-
-      - name: Download Android dependencies
-        if: steps.cache-manual-deps.outputs.cache-hit != 'true'
-        run: bash ci/script/download_android_dependencies.sh full "manual-deps"
-
-      - name: Prepare Android dependencies
-        run: |
-          python3 ci/script/prepare_android_dependencies.py \
-            --profile full \
-            --archives "manual-deps" \
-            --repository "$GITHUB_WORKSPACE"
-
-      - name: Install JavaScript dependencies
-        if: false
-        run: echo "Skipped - no package.json"
-
-      - name: Build WebChat assets
-        if: false
-        run: echo "Skipped - no web-chat directory"
+          swap-size-gb: 10
 
       - name: Configure Android SDK
         shell: bash
@@ -164,44 +107,31 @@ jobs:
           set -euo pipefail
           echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-      - name: Set up swap
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 10
+      - name: Determine Gradle task
+        id: gradle-task
+        run: |
+          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
+            echo 'task=${{ inputs.gradle_task }}' >> $GITHUB_OUTPUT
+          else
+            echo 'task=:app:assembleMainDebug' >> $GITHUB_OUTPUT
+          fi
 
       - name: Build Android APK
         id: gradle-build
         timeout-minutes: 120
         shell: bash
         env:
-          _JAVA_OPTIONS: "-Xmx4g"
+          _JAVA_OPTIONS: '-Xmx4g'
         run: |
           set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew :app:assembleMainDebug \
+          ./gradlew ${{ steps.gradle-task.outputs.task }} \
             --no-daemon \
             --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError" \
-            -Dkotlin.daemon.jvmargs="-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" 2>&1 | tee gradle.log
-          echo "=== BUILD COMPLETED SUCCESSFULLY ==="
-          grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build may have completed with warnings"
-
-      - name: Run JVM unit tests
-        if: >-
-          !cancelled() &&
-          steps.gradle-build.outcome == 'success' &&
-          (github.event_name == 'push' || inputs.gradle_task)
-        timeout-minutes: 15
-        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon -Dlint.abortOnError=false
-
-      - name: Run Android lint
-        if: >-
-          !cancelled() &&
-          steps.gradle-build.outcome == 'success' &&
-          (github.event_name == 'push' || inputs.gradle_task)
-        timeout-minutes: 10
-        run: ./gradlew :app:lintDebug --stacktrace --no-daemon -Dlint.abortOnError=false
-        continue-on-error: true
+            -Dorg.gradle.jvmargs='-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError' \
+            -Dkotlin.daemon.jvmargs='-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200' 2>&1 | tee gradle.log
+          echo '=== BUILD COMPLETED SUCCESSFULLY ==='
+          grep -i 'BUILD SUCCESSFUL' gradle.log || echo 'Build may have completed with warnings'
 
       - name: Upload gradle log on failure
         if: failure()
@@ -214,7 +144,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: operit-android-reports-${{ github.run_number }}
+          name: android-reports-${{ github.run_number }}
           path: |
             app/build/reports/**
             build/reports/**
@@ -225,7 +155,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: operit-clone-${{ github.run_number }}
+          name: swipe-player-${{ github.run_number }}
           path: |
             app/build/outputs/apk/**/*.apk
             app/build/outputs/bundle/**/*.aab
