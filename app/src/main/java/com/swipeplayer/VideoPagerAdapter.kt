@@ -8,11 +8,12 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ui.PlayerView
+import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
+import androidx.media3.ui.PlayerView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player.PositionInfo
+import androidx.media3.exoplayer.ExoPlayer
 
 class VideoPagerAdapter(
     private val context: Context,
