@@ -1,4 +1,4 @@
-package com.swipeplayer
+package com.swipe.player
 
 import android.os.Bundle
 import android.util.Log

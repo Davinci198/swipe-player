@@ -1,4 +1,4 @@
-package com.swipeplayer;
+package com.swipe.player;
 public class DragonBonesBridge {
     static {
         System.loadLibrary("dragonbones_native");

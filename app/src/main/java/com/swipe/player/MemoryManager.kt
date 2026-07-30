@@ -1,4 +1,4 @@
-package com.swipeplayer
+package com.swipe.player
 
 import android.content.Context
 import android.content.SharedPreferences

@@ -1,4 +1,4 @@
-package com.swipeplayer;
+package com.swipe.player;
 
 // MainActivity moved to Kotlin implementation: app/src/main/java/com/swipeplayer/MainActivity.kt
 // This Java file is intentionally left as a placeholder to avoid duplicate-class compile errors.
