@@ -68,7 +68,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Cache Gradle + CMake
+      - name: Cache Gradle + CMake NDK
         uses: actions/cache@v4
         with:
           path: |
@@ -80,13 +80,13 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Setup NDK
+      - name: Setup NDK r27 + CMake
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26d
+          ndk-version: r27
           link-to-sdk: true
 
-      - name: Install Platforms, Build-Tools and CMake
+      - name: Install Platforms and Build-Tools
         shell: bash
         run: |
           set -euo pipefail
@@ -99,8 +99,7 @@ jobs:
             'platforms;android-34' \
             'platforms;android-36' \
             'build-tools;34.0.0' \
-            'build-tools;35.0.0' \
-            'cmake;3.22.1'
+            'build-tools;35.0.0'
           echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
           echo "NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
@@ -119,10 +118,10 @@ jobs:
       - name: Determine Gradle task
         id: gradle-task
         run: |
-          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
-            echo 'task=${{ inputs.gradle_task }}' >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "task=${{ inputs.gradle_task }}" >> $GITHUB_OUTPUT
           else
-            echo 'task=:app:assembleMainDebug' >> $GITHUB_OUTPUT
+            echo "task=:app:assembleMainDebug" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Android APK
