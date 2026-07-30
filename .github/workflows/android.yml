@@ -1,8 +1,6 @@
 name: Build APK
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       build_variant:
@@ -103,7 +101,7 @@ jobs:
           case "${BUILD_VARIANT:-debug}" in
             clone) TASK=":app:assembleCloneDebug" ;;
             release) TASK=":app:assembleRelease" ;;
-            debug|*) TASK=":app:assembleDebug" ;;
+            debug|*) TASK=":app:assembleMainDebug" ;;
           esac
           
           echo "Running: gradle $TASK"
