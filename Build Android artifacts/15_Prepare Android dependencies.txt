@@ -1,0 +1,27 @@
+﻿2026-07-30T11:57:23.2254546Z ##[group]Run python3 ci/script/prepare_android_dependencies.py \
+2026-07-30T11:57:23.2255040Z [36;1mpython3 ci/script/prepare_android_dependencies.py \[0m
+2026-07-30T11:57:23.2255398Z [36;1m  --profile full \[0m
+2026-07-30T11:57:23.2255668Z [36;1m  --archives "manual-deps" \[0m
+2026-07-30T11:57:23.2255975Z [36;1m  --repository "$GITHUB_WORKSPACE"[0m
+2026-07-30T11:57:23.2286292Z shell: /usr/bin/bash -e {0}
+2026-07-30T11:57:23.2286857Z env:
+2026-07-30T11:57:23.2287063Z   JAVA_VERSION: 21
+2026-07-30T11:57:23.2287273Z   NODE_VERSION: 22
+2026-07-30T11:57:23.2287490Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:57:23.2287778Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:57:23.2288028Z   GRADLE_VERSION: 8.5
+2026-07-30T11:57:23.2288240Z   RUST_VERSION: 1.88.0
+2026-07-30T11:57:23.2288459Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:57:23.2288767Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:23.2289206Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:57:23.2289666Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:23.2290055Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:23.2290437Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:23.2290818Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:57:23.2291244Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:23.2291737Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:23.2292122Z   MAVEN_ARGS: -ntp
+2026-07-30T11:57:23.2292358Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-07-30T11:57:23.2292658Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-07-30T11:57:23.2292948Z ##[endgroup]
+2026-07-30T11:57:24.2883533Z Prepared Android full dependencies from manual-deps.

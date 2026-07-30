@@ -1,0 +1,178 @@
+﻿2026-07-30T11:57:24.3129973Z ##[group]Run pierotofy/set-swap-space@master
+2026-07-30T11:57:24.3130306Z with:
+2026-07-30T11:57:24.3130500Z   swap-size-gb: 10
+2026-07-30T11:57:24.3130702Z env:
+2026-07-30T11:57:24.3130888Z   JAVA_VERSION: 21
+2026-07-30T11:57:24.3131090Z   NODE_VERSION: 22
+2026-07-30T11:57:24.3131297Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:57:24.3131570Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:57:24.3131817Z   GRADLE_VERSION: 8.5
+2026-07-30T11:57:24.3132033Z   RUST_VERSION: 1.88.0
+2026-07-30T11:57:24.3132254Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:57:24.3132556Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3132999Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:57:24.3133432Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3133816Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3134194Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3134612Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:57:24.3135048Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3135544Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3135925Z   MAVEN_ARGS: -ntp
+2026-07-30T11:57:24.3136154Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3136637Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3136928Z ##[endgroup]
+2026-07-30T11:57:24.3141268Z ##[start-action display=Swap space report before modification;id=__pierotofy_set-swap-space.__run]
+2026-07-30T11:57:24.3155037Z ##[group]Run echo "Memory and swap:"
+2026-07-30T11:57:24.3155336Z [36;1mecho "Memory and swap:"[0m
+2026-07-30T11:57:24.3155595Z [36;1mfree -h[0m
+2026-07-30T11:57:24.3155794Z [36;1mecho[0m
+2026-07-30T11:57:24.3155997Z [36;1mswapon --show[0m
+2026-07-30T11:57:24.3156218Z [36;1mecho[0m
+2026-07-30T11:57:24.3183519Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-30T11:57:24.3183877Z env:
+2026-07-30T11:57:24.3184065Z   JAVA_VERSION: 21
+2026-07-30T11:57:24.3184271Z   NODE_VERSION: 22
+2026-07-30T11:57:24.3184479Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:57:24.3184746Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:57:24.3184993Z   GRADLE_VERSION: 8.5
+2026-07-30T11:57:24.3185204Z   RUST_VERSION: 1.88.0
+2026-07-30T11:57:24.3185425Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:57:24.3185718Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3186161Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:57:24.3186735Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3187122Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3187497Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3187874Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:57:24.3188308Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3188952Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3189336Z   MAVEN_ARGS: -ntp
+2026-07-30T11:57:24.3189569Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3189863Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3190140Z ##[endgroup]
+2026-07-30T11:57:24.3239877Z Memory and swap:
+2026-07-30T11:57:24.3256686Z                total        used        free      shared  buff/cache   available
+2026-07-30T11:57:24.3257504Z Mem:            15Gi       1.8Gi       5.4Gi        46Mi       8.8Gi        13Gi
+2026-07-30T11:57:24.3258001Z Swap:          3.0Gi          0B       3.0Gi
+2026-07-30T11:57:24.3258838Z 
+2026-07-30T11:57:24.3273341Z NAME      TYPE SIZE USED PRIO
+2026-07-30T11:57:24.3273962Z /swapfile file   3G   0B   -2
+2026-07-30T11:57:24.3275435Z 
+2026-07-30T11:57:24.3281966Z ##[end-action id=__pierotofy_set-swap-space.__run;outcome=success;conclusion=success;duration_ms=13]
+2026-07-30T11:57:24.3284066Z ##[start-action display=Set Swap;id=__pierotofy_set-swap-space.__run_2]
+2026-07-30T11:57:24.3299964Z ##[group]Run set -euo pipefail
+2026-07-30T11:57:24.3300289Z [36;1mset -euo pipefail[0m
+2026-07-30T11:57:24.3300521Z [36;1m[0m
+2026-07-30T11:57:24.3300731Z [36;1m# get currently active swap file[0m
+2026-07-30T11:57:24.3301117Z [36;1mSWAP_FILE=$(swapon --noheadings --show=NAME | tail -n 1 || true)[0m
+2026-07-30T11:57:24.3301488Z [36;1m[0m
+2026-07-30T11:57:24.3301730Z [36;1mif [ -n "$SWAP_FILE" ] && [ -f "$SWAP_FILE" ]; then[0m
+2026-07-30T11:57:24.3302067Z [36;1m  echo "Swap file: $SWAP_FILE"[0m
+2026-07-30T11:57:24.3302489Z [36;1m  sudo swapoff "$SWAP_FILE" || echo "Failed to swapoff $SWAP_FILE (maybe not active)"[0m
+2026-07-30T11:57:24.3302928Z [36;1m  sudo rm -f "$SWAP_FILE"[0m
+2026-07-30T11:57:24.3303183Z [36;1melse[0m
+2026-07-30T11:57:24.3303418Z [36;1m  echo "No active swap, using /swapfile"[0m
+2026-07-30T11:57:24.3303731Z [36;1m  SWAP_FILE=/swapfile[0m
+2026-07-30T11:57:24.3303976Z [36;1mfi[0m
+2026-07-30T11:57:24.3304158Z [36;1m[0m
+2026-07-30T11:57:24.3304393Z [36;1m# determine FS type to pick allocation method[0m
+2026-07-30T11:57:24.3304808Z [36;1mFS_TYPE=$(df --output=fstype "$(dirname "$SWAP_FILE")" | tail -n 1)[0m
+2026-07-30T11:57:24.3305186Z [36;1m[0m
+2026-07-30T11:57:24.3305487Z [36;1mecho "Creating swapfile at $SWAP_FILE on filesystem type: $FS_TYPE"[0m
+2026-07-30T11:57:24.3305856Z [36;1m[0m
+2026-07-30T11:57:24.3306109Z [36;1mif [[ "$FS_TYPE" == "xfs" || "$FS_TYPE" == "btrfs" ]]; then[0m
+2026-07-30T11:57:24.3306752Z [36;1m  echo "Using dd for compatibility with $FS_TYPE"[0m
+2026-07-30T11:57:24.3307188Z [36;1m  sudo dd if=/dev/zero of="$SWAP_FILE" bs=1M count=10K status=progress[0m
+2026-07-30T11:57:24.3307557Z [36;1melse[0m
+2026-07-30T11:57:24.3307813Z [36;1m  echo "Using fallocate for fast allocation"[0m
+2026-07-30T11:57:24.3308149Z [36;1m  sudo fallocate -l "10G" "$SWAP_FILE"[0m
+2026-07-30T11:57:24.3308433Z [36;1mfi[0m
+2026-07-30T11:57:24.3308620Z [36;1m[0m
+2026-07-30T11:57:24.3308818Z [36;1m# common swap file prep[0m
+2026-07-30T11:57:24.3309092Z [36;1msudo chmod 600 "$SWAP_FILE"[0m
+2026-07-30T11:57:24.3309347Z [36;1m[0m
+2026-07-30T11:57:24.3309556Z [36;1m# attempt to disable CoW if on btrfs[0m
+2026-07-30T11:57:24.3309859Z [36;1mif [[ "$FS_TYPE" == "btrfs" ]]; then[0m
+2026-07-30T11:57:24.3310185Z [36;1m  echo "Disabling CoW and compression on btrfs"[0m
+2026-07-30T11:57:24.3310599Z [36;1m  sudo chattr +C "$SWAP_FILE" || echo "chattr +C failed, continuing"[0m
+2026-07-30T11:57:24.3311150Z [36;1m  sudo btrfs property set "$SWAP_FILE" compression none || echo "compression disable failed"[0m
+2026-07-30T11:57:24.3311601Z [36;1mfi[0m
+2026-07-30T11:57:24.3311790Z [36;1m[0m
+2026-07-30T11:57:24.3311987Z [36;1m# attempt to init swap space[0m
+2026-07-30T11:57:24.3312270Z [36;1mif sudo mkswap "$SWAP_FILE"; then[0m
+2026-07-30T11:57:24.3312588Z [36;1m  echo "Swap file formatted successfully"[0m
+2026-07-30T11:57:24.3313039Z [36;1melse[0m
+2026-07-30T11:57:24.3313329Z [36;1m  echo "WARNING: mkswap failed. File may be sparse or invalid."[0m
+2026-07-30T11:57:24.3313681Z [36;1mfi[0m
+2026-07-30T11:57:24.3313865Z [36;1m[0m
+2026-07-30T11:57:24.3314059Z [36;1m# attempt to enable swap[0m
+2026-07-30T11:57:24.3314335Z [36;1mif sudo swapon "$SWAP_FILE"; then[0m
+2026-07-30T11:57:24.3314634Z [36;1m  echo "Swap enabled at $SWAP_FILE"[0m
+2026-07-30T11:57:24.3314905Z [36;1melse[0m
+2026-07-30T11:57:24.3315308Z [36;1m  echo "WARNING: swapon failed (likely due to host or kernel restrictions). Continuing without swap."[0m
+2026-07-30T11:57:24.3315782Z [36;1mfi[0m
+2026-07-30T11:57:24.3342794Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-30T11:57:24.3343139Z env:
+2026-07-30T11:57:24.3343326Z   JAVA_VERSION: 21
+2026-07-30T11:57:24.3343536Z   NODE_VERSION: 22
+2026-07-30T11:57:24.3343746Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:57:24.3344012Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:57:24.3344412Z   GRADLE_VERSION: 8.5
+2026-07-30T11:57:24.3344624Z   RUST_VERSION: 1.88.0
+2026-07-30T11:57:24.3344844Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:57:24.3345135Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3345568Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:57:24.3346008Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3346654Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3347068Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.3347468Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:57:24.3347901Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3348383Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.3348771Z   MAVEN_ARGS: -ntp
+2026-07-30T11:57:24.3348997Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3349303Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.3349581Z ##[endgroup]
+2026-07-30T11:57:24.3420947Z Swap file: /swapfile
+2026-07-30T11:57:24.3655262Z Creating swapfile at /swapfile on filesystem type: ext4
+2026-07-30T11:57:24.3655941Z Using fallocate for fast allocation
+2026-07-30T11:57:24.4071413Z Setting up swapspace version 1, size = 10 GiB (10737414144 bytes)
+2026-07-30T11:57:24.4072310Z no label, UUID=24f0e535-64e6-4264-878f-ce3d8409deb9
+2026-07-30T11:57:24.4080481Z Swap file formatted successfully
+2026-07-30T11:57:24.4164375Z Swap enabled at /swapfile
+2026-07-30T11:57:24.4171093Z ##[end-action id=__pierotofy_set-swap-space.__run_2;outcome=success;conclusion=success;duration_ms=88]
+2026-07-30T11:57:24.4173459Z ##[start-action display=Swap space report after modification;id=__pierotofy_set-swap-space.__run_3]
+2026-07-30T11:57:24.4202276Z ##[group]Run echo "Memory and swap:"
+2026-07-30T11:57:24.4202594Z [36;1mecho "Memory and swap:"[0m
+2026-07-30T11:57:24.4202867Z [36;1mfree -h[0m
+2026-07-30T11:57:24.4203077Z [36;1mecho[0m
+2026-07-30T11:57:24.4203283Z [36;1mswapon --show[0m
+2026-07-30T11:57:24.4203506Z [36;1mecho[0m
+2026-07-30T11:57:24.4233771Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-30T11:57:24.4234121Z env:
+2026-07-30T11:57:24.4234318Z   JAVA_VERSION: 21
+2026-07-30T11:57:24.4234529Z   NODE_VERSION: 22
+2026-07-30T11:57:24.4234735Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:57:24.4235006Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:57:24.4235262Z   GRADLE_VERSION: 8.5
+2026-07-30T11:57:24.4235473Z   RUST_VERSION: 1.88.0
+2026-07-30T11:57:24.4235690Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:57:24.4235986Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.4236646Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:57:24.4237107Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.4237496Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.4238067Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:57:24.4238449Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:57:24.4238909Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.4239394Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:57:24.4239771Z   MAVEN_ARGS: -ntp
+2026-07-30T11:57:24.4240005Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.4240298Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-07-30T11:57:24.4240573Z ##[endgroup]
+2026-07-30T11:57:24.4293124Z Memory and swap:
+2026-07-30T11:57:24.4316585Z                total        used        free      shared  buff/cache   available
+2026-07-30T11:57:24.4317486Z Mem:            15Gi       1.8Gi       5.4Gi        46Mi       8.8Gi        13Gi
+2026-07-30T11:57:24.4317996Z Swap:            9Gi          0B         9Gi
+2026-07-30T11:57:24.4319217Z 
+2026-07-30T11:57:24.4333639Z NAME      TYPE SIZE USED PRIO
+2026-07-30T11:57:24.4334421Z /swapfile file  10G   0B   -2
+2026-07-30T11:57:24.4335523Z 
+2026-07-30T11:57:24.4344172Z ##[end-action id=__pierotofy_set-swap-space.__run_3;outcome=success;conclusion=success;duration_ms=16]

@@ -1,0 +1,117 @@
+﻿2026-07-30T11:56:20.8229738Z ##[group]Run cat dragonbones/CMakeLists.txt
+2026-07-30T11:56:20.8230095Z [36;1mcat dragonbones/CMakeLists.txt[0m
+2026-07-30T11:56:20.8230408Z [36;1mecho '--- Patching for NDK27 if needed ---'[0m
+2026-07-30T11:56:20.8230970Z [36;1msed -i 's/-std=c++11/-std=c++17 -faligned-new/g; s/-std=c++14/-std=c++17 -faligned-new/g' dragonbones/CMakeLists.txt || true[0m
+2026-07-30T11:56:20.8231919Z [36;1mgrep -q 'faligned-new' dragonbones/CMakeLists.txt || echo 'target_compile_options(dragonbones_native PRIVATE -faligned-new -std=c++17)' >> dragonbones/CMakeLists.txt[0m
+2026-07-30T11:56:20.8232642Z [36;1mecho '--- Final CMakeLists ---'[0m
+2026-07-30T11:56:20.8232914Z [36;1mcat dragonbones/CMakeLists.txt[0m
+2026-07-30T11:56:20.8260218Z shell: /usr/bin/bash -e {0}
+2026-07-30T11:56:20.8260461Z env:
+2026-07-30T11:56:20.8260638Z   JAVA_VERSION: 21
+2026-07-30T11:56:20.8260839Z   NODE_VERSION: 22
+2026-07-30T11:56:20.8261032Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:56:20.8261279Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:56:20.8261542Z   GRADLE_VERSION: 8.5
+2026-07-30T11:56:20.8261737Z   RUST_VERSION: 1.88.0
+2026-07-30T11:56:20.8261941Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:56:20.8262142Z ##[endgroup]
+2026-07-30T11:56:20.8315172Z cmake_minimum_required(VERSION 3.22.1)
+2026-07-30T11:56:20.8315703Z project("dragonbones_native")
+2026-07-30T11:56:20.8316018Z 
+2026-07-30T11:56:20.8316206Z # === OPERIT BUILD - Dragonbones Module ===
+2026-07-30T11:56:20.8316991Z # FIX NDK 27: C++17 + aligned new/delete
+2026-07-30T11:56:20.8317319Z 
+2026-07-30T11:56:20.8317484Z set(CMAKE_CXX_STANDARD 17)
+2026-07-30T11:56:20.8317907Z set(CMAKE_CXX_STANDARD_REQUIRED ON)
+2026-07-30T11:56:20.8318432Z set(CMAKE_CXX_EXTENSIONS OFF)
+2026-07-30T11:56:20.8318836Z 
+2026-07-30T11:56:20.8319292Z set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -faligned-new -fexceptions -frtti")
+2026-07-30T11:56:20.8319792Z set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions")
+2026-07-30T11:56:20.8320024Z 
+2026-07-30T11:56:20.8320125Z file(GLOB_RECURSE DRAGONBONES_SOURCES
+2026-07-30T11:56:20.8320412Z     "cpp/dragonBones/animation/*.cpp"
+2026-07-30T11:56:20.8320680Z     "cpp/dragonBones/armature/*.cpp"
+2026-07-30T11:56:20.8320937Z     "cpp/dragonBones/core/*.cpp"
+2026-07-30T11:56:20.8321186Z     "cpp/dragonBones/event/*.cpp"
+2026-07-30T11:56:20.8321435Z     "cpp/dragonBones/factory/*.cpp"
+2026-07-30T11:56:20.8321695Z     "cpp/dragonBones/geom/*.cpp"
+2026-07-30T11:56:20.8321935Z     "cpp/dragonBones/model/*.cpp"
+2026-07-30T11:56:20.8322185Z     "cpp/dragonBones/parser/*.cpp"
+2026-07-30T11:56:20.8322443Z     "cpp/opengl/OpenGLSlot.cpp"
+2026-07-30T11:56:20.8322692Z     "cpp/opengl/OpenGLFactory.cpp"
+2026-07-30T11:56:20.8322929Z )
+2026-07-30T11:56:20.8323021Z 
+2026-07-30T11:56:20.8323100Z add_library(
+2026-07-30T11:56:20.8323289Z     dragonbones_native
+2026-07-30T11:56:20.8323491Z     SHARED
+2026-07-30T11:56:20.8323674Z     "cpp/JniBridge.cpp"
+2026-07-30T11:56:20.8323893Z     ${DRAGONBONES_SOURCES}
+2026-07-30T11:56:20.8324102Z )
+2026-07-30T11:56:20.8324192Z 
+2026-07-30T11:56:20.8324340Z target_include_directories(dragonbones_native PRIVATE
+2026-07-30T11:56:20.8324641Z     "cpp"
+2026-07-30T11:56:20.8324832Z     "cpp/thirdParty/stb"
+2026-07-30T11:56:20.8325037Z )
+2026-07-30T11:56:20.8325126Z 
+2026-07-30T11:56:20.8325293Z # FIX: Link ONLY android libs, c++_shared vine automat de la Gradle
+2026-07-30T11:56:20.8325645Z # NU MAI LINKUI c++abi explicit!
+2026-07-30T11:56:20.8325921Z target_link_libraries(dragonbones_native PRIVATE
+2026-07-30T11:56:20.8326198Z     android
+2026-07-30T11:56:20.8326367Z     log
+2026-07-30T11:56:20.8326951Z     GLESv2
+2026-07-30T11:56:20.8327127Z     c++_shared
+2026-07-30T11:56:20.8327319Z )
+2026-07-30T11:56:20.8327411Z 
+2026-07-30T11:56:20.8327517Z # 16KB page size support (Android 15+)
+2026-07-30T11:56:20.8327912Z target_link_options(dragonbones_native PRIVATE "-Wl,-z,max-page-size=16384")
+2026-07-30T11:56:20.8328311Z --- Patching for NDK27 if needed ---
+2026-07-30T11:56:20.8345945Z --- Final CMakeLists ---
+2026-07-30T11:56:20.8354712Z cmake_minimum_required(VERSION 3.22.1)
+2026-07-30T11:56:20.8355545Z project("dragonbones_native")
+2026-07-30T11:56:20.8355728Z 
+2026-07-30T11:56:20.8355840Z # === OPERIT BUILD - Dragonbones Module ===
+2026-07-30T11:56:20.8356135Z # FIX NDK 27: C++17 + aligned new/delete
+2026-07-30T11:56:20.8356317Z 
+2026-07-30T11:56:20.8356627Z set(CMAKE_CXX_STANDARD 17)
+2026-07-30T11:56:20.8356919Z set(CMAKE_CXX_STANDARD_REQUIRED ON)
+2026-07-30T11:56:20.8357174Z set(CMAKE_CXX_EXTENSIONS OFF)
+2026-07-30T11:56:20.8357327Z 
+2026-07-30T11:56:20.8357580Z set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -faligned-new -fexceptions -frtti")
+2026-07-30T11:56:20.8358123Z set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions")
+2026-07-30T11:56:20.8358754Z 
+2026-07-30T11:56:20.8358926Z file(GLOB_RECURSE DRAGONBONES_SOURCES
+2026-07-30T11:56:20.8359386Z     "cpp/dragonBones/animation/*.cpp"
+2026-07-30T11:56:20.8359668Z     "cpp/dragonBones/armature/*.cpp"
+2026-07-30T11:56:20.8359920Z     "cpp/dragonBones/core/*.cpp"
+2026-07-30T11:56:20.8360162Z     "cpp/dragonBones/event/*.cpp"
+2026-07-30T11:56:20.8360416Z     "cpp/dragonBones/factory/*.cpp"
+2026-07-30T11:56:20.8360661Z     "cpp/dragonBones/geom/*.cpp"
+2026-07-30T11:56:20.8360897Z     "cpp/dragonBones/model/*.cpp"
+2026-07-30T11:56:20.8361139Z     "cpp/dragonBones/parser/*.cpp"
+2026-07-30T11:56:20.8361393Z     "cpp/opengl/OpenGLSlot.cpp"
+2026-07-30T11:56:20.8361640Z     "cpp/opengl/OpenGLFactory.cpp"
+2026-07-30T11:56:20.8361871Z )
+2026-07-30T11:56:20.8361962Z 
+2026-07-30T11:56:20.8362040Z add_library(
+2026-07-30T11:56:20.8362232Z     dragonbones_native
+2026-07-30T11:56:20.8362439Z     SHARED
+2026-07-30T11:56:20.8362621Z     "cpp/JniBridge.cpp"
+2026-07-30T11:56:20.8362839Z     ${DRAGONBONES_SOURCES}
+2026-07-30T11:56:20.8363046Z )
+2026-07-30T11:56:20.8363134Z 
+2026-07-30T11:56:20.8363269Z target_include_directories(dragonbones_native PRIVATE
+2026-07-30T11:56:20.8363560Z     "cpp"
+2026-07-30T11:56:20.8363739Z     "cpp/thirdParty/stb"
+2026-07-30T11:56:20.8363941Z )
+2026-07-30T11:56:20.8364028Z 
+2026-07-30T11:56:20.8364195Z # FIX: Link ONLY android libs, c++_shared vine automat de la Gradle
+2026-07-30T11:56:20.8364540Z # NU MAI LINKUI c++abi explicit!
+2026-07-30T11:56:20.8364811Z target_link_libraries(dragonbones_native PRIVATE
+2026-07-30T11:56:20.8365093Z     android
+2026-07-30T11:56:20.8365262Z     log
+2026-07-30T11:56:20.8365430Z     GLESv2
+2026-07-30T11:56:20.8365597Z     c++_shared
+2026-07-30T11:56:20.8365765Z )
+2026-07-30T11:56:20.8365862Z 
+2026-07-30T11:56:20.8365963Z # 16KB page size support (Android 15+)
+2026-07-30T11:56:20.8366341Z target_link_options(dragonbones_native PRIVATE "-Wl,-z,max-page-size=16384")

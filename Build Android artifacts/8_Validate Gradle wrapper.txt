@@ -1,0 +1,25 @@
+﻿2026-07-30T11:56:21.2007999Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-30T11:56:21.2009308Z ##[group]Run gradle/wrapper-validation-action@v2
+2026-07-30T11:56:21.2009597Z with:
+2026-07-30T11:56:21.2009787Z   min-wrapper-count: 1
+2026-07-30T11:56:21.2010005Z   allow-snapshots: false
+2026-07-30T11:56:21.2010213Z env:
+2026-07-30T11:56:21.2010382Z   JAVA_VERSION: 21
+2026-07-30T11:56:21.2010574Z   NODE_VERSION: 22
+2026-07-30T11:56:21.2010770Z   ANDROID_NDK_VERSION: 27.0.12077973
+2026-07-30T11:56:21.2011021Z   ANDROID_CMAKE_VERSION: 3.22.1
+2026-07-30T11:56:21.2011247Z   GRADLE_VERSION: 8.5
+2026-07-30T11:56:21.2021527Z   RUST_VERSION: 1.88.0
+2026-07-30T11:56:21.2021933Z   _JAVA_OPTIONS: -Xmx4g
+2026-07-30T11:56:21.2022408Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:56:21.2022915Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig
+2026-07-30T11:56:21.2023546Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:56:21.2023933Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:56:21.2024303Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.13/x64
+2026-07-30T11:56:21.2024671Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.13/x64/lib
+2026-07-30T11:56:21.2025086Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:56:21.2025550Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.11-10/x64
+2026-07-30T11:56:21.2025921Z   MAVEN_ARGS: -ntp
+2026-07-30T11:56:21.2026117Z ##[endgroup]
+2026-07-30T11:56:21.2893653Z ✓ Found known Gradle Wrapper JAR files:
+2026-07-30T11:56:21.2894993Z   d3b261c2820e9e3d8d639ed084900f11f4a86050a8f83342ade7b6bc9b0d2bdd gradle/wrapper/gradle-wrapper.jar
