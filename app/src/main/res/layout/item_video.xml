@@ -2,15 +2,33 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
+    android:layout_height="match_parent"
+    android:background="#FF050507">
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:use_controller="false"
-        android:paddingTop="32dp" />
-
+        app:use_controller="true"
+        app:resize_mode="fit" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="visible"
+        android:id="@+id/loadingContainer">
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Loading video..."
+            android:textColor="#99FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
     <TextView
         android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
@@ -21,7 +39,6 @@
         android:textSize="16sp"
         android:shadowColor="#000000"
         android:shadowRadius="4" />
-
     <ImageButton
         android:id="@+id/btnFavorite"
         android:layout_width="48dp"
@@ -29,6 +46,6 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:background="@android:color/transparent"
-        android:scaleType="fitCenter" />
-
+        android:scaleType="fitCenter"
+        android:src="@android:drawable/btn_star_big_off" />
 </FrameLayout>
