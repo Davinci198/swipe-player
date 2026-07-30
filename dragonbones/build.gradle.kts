@@ -31,8 +31,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     sourceSets["main"].manifest.srcFile("src/main/AndroidManifest.xml")
 
@@ -53,7 +53,7 @@ android {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(1.8)
 }
 
 dependencies {
