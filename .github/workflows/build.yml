@@ -30,8 +30,6 @@ permissions:
   contents: read
 env:
   JAVA_VERSION: '21'
-  ANDROID_NDK_VERSION: '27.0.12077973'
-  ANDROID_CMAKE_VERSION: '3.22.1'
   _JAVA_OPTIONS: '-Xmx4g'
 jobs:
   build:
@@ -82,22 +80,19 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Install NDK, CMake and Platforms
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          link-to-sdk: true
+
+      - name: Install Platforms, Build-Tools and CMake
         shell: bash
         run: |
           set -euo pipefail
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          SDKMANAGER=""
-          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          elif [ -x "$ANDROID_HOME/cmdline-tools/android-sdk-cmdline-tools/latest/bin/sdkmanager" ]; then
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$ANDROID_HOME/cmdline-tools/android-sdk-cmdline-tools/latest/bin/sdkmanager"
-          else
-            SDKMANAGER=$(which sdkmanager 2>/dev/null || echo "")
-          fi
-          if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found in ANDROID_HOME or PATH"
-            exit 1
           fi
           echo "Using SDKMANAGER: $SDKMANAGER"
           yes | "$SDKMANAGER" --install \
@@ -105,10 +100,10 @@ jobs:
             'platforms;android-36' \
             'build-tools;34.0.0' \
             'build-tools;35.0.0' \
-            "ndk;$ANDROID_NDK_VERSION" \
-            "cmake;$ANDROID_CMAKE_VERSION"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> $GITHUB_ENV
+            'cmake;3.22.1'
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
+          echo "NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
 
       - name: Set up swap
         uses: pierotofy/set-swap-space@master
