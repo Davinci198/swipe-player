@@ -71,6 +71,29 @@ jobs:
           echo "Gradle $GRADLE_VERSION installed"
           gradle --version
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Restore Android dependency cache
+        id: cache-manual-deps
+        uses: actions/cache@v4
+        with:
+          path: manual-deps
+          key: android-deps-${{ runner.os }}-${{ hashFiles('ci/script/download_android_dependencies.sh', 'ci/script/prepare_android_dependencies.py') }}
+
+      - name: Download Android dependencies
+        if: steps.cache-manual-deps.outputs.cache-hit != 'true'
+        run: bash ci/script/download_android_dependencies.sh full "manual-deps"
+
+      - name: Prepare Android dependencies
+        run: |
+          python3 ci/script/prepare_android_dependencies.py \
+            --profile full \
+            --archives "manual-deps" \
+            --repository "$GITHUB_WORKSPACE"
+
       - name: Build APK
         env:
           BUILD_VARIANT: ${{ inputs.build_variant }}
