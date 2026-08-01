@@ -27,6 +27,7 @@ class MemoryManager private constructor(context: Context) {
         private const val KEY_HISTORY = "istoric"
         private const val KEY_FAVORITES = "favorite"
         private const val KEY_SETTINGS = "setari"
+        private const val KEY_RESOLUTIE = "rezolutie"
         private const val MAX_HISTORY = 200
 
         @Volatile
@@ -253,6 +254,20 @@ class MemoryManager private constructor(context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
+    }
+
+    /**
+     * Salvează rezoluția de redare aleasă (înălțime în pixeli: 0=Auto, 720, 1080, 1440, 2160).
+     */
+    fun salveazaRezolutie(inaltime: Int) {
+        prefs.edit().putInt(KEY_RESOLUTIE, inaltime).apply()
+    }
+
+    /**
+     * Încarcă rezoluția salvată (0 = Auto dacă nu există).
+     */
+    fun incarcaRezolutie(): Int {
+        return prefs.getInt(KEY_RESOLUTIE, 0)
     }
 
     /**

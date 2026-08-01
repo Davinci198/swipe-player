@@ -40,4 +40,19 @@
             android:textColor="#000000"
             android:backgroundTint="#FFFFFF" />
     </LinearLayout>
+
+    <!-- Buton setari: sus, colt stanga -->
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="14dp"
+        android:contentDescription="Setări"
+        android:background="@drawable/bg_settings"
+        android:src="@android:drawable/ic_menu_manage"
+        android:scaleType="centerInside"
+        android:padding="12dp"
+        android:elevation="4dp"
+        android:alpha="0.9" />
 </FrameLayout>

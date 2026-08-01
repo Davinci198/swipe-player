@@ -9,7 +9,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
+    private var rezolutieCurenta: Int = 0 // 0=Auto, 720, 1080, 1440 (2K), 2160 (4K)
     private var adapter: VideoPagerAdapter? = null
     private var videouri: MutableList<Uri> = mutableListOf()
 
@@ -45,6 +48,10 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tvStatus)
         viewPager = findViewById(R.id.viewPager)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        // Buton setari (colt stanga sus)
+        val btnSettings = findViewById<android.widget.ImageButton>(R.id.btnSettings)
+        btnSettings.setOnClickListener { deschideSetari() }
 
         // Scroll VERTICAL (sus/jos) - ca TikTok
         viewPager.orientation = ViewPager2.ORIENTATION_VERTICAL
@@ -56,6 +63,7 @@ class MainActivity : AppCompatActivity() {
             volumCurent = setari.first
             luminozitateCurenta = setari.second
         }
+        rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
 
         val btnAlege = findViewById<Button>(R.id.btnChoose)
         btnAlege.setOnClickListener { alegeVideoclipuri() }
@@ -147,6 +155,9 @@ class MainActivity : AppCompatActivity() {
         )
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
+        // aplica rezoluția salvată (0=Auto, 720, 1080, 1440/2K, 2160/4K)
+        val (rw, rh) = rezolutieW(rezolutieCurenta)
+        if (rw > 0) nouAdapter.setResolutie(rw, rh)
         adapter = nouAdapter
         viewPager.adapter = nouAdapter
 
@@ -190,8 +201,105 @@ class MainActivity : AppCompatActivity() {
     private fun salveazaSetarileCurente() {
         try {
             MemoryManager.getInstance(this).salveazaSetari(volumCurent, luminozitateCurenta)
+            MemoryManager.getInstance(this).salveazaRezolutie(rezolutieCurenta)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
+    }
+
+    // înălțime salvată -> (width, height) maxim pentru decodare; 0=Auto
+    private fun rezolutieW(h: Int): Pair<Int, Int> = when (h) {
+        720 -> Pair(1280, 720)
+        1080 -> Pair(1920, 1080)
+        1440 -> Pair(2560, 1440) // 2K
+        2160 -> Pair(3840, 2160) // 4K
+        else -> Pair(7680, 4320) // Auto
+    }
+    private fun deschideSetari() {
+        val mm = MemoryManager.getInstance(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(64, 32, 64, 32)
+        }
+
+        // ---- Luminozitate ----
+        root.addView(TextView(this).apply {
+            text = "Luminozitate"
+            textSize = 15f
+            setTextColor(android.graphics.Color.WHITE)
+        })
+        val seekLumina = android.widget.SeekBar(this).apply {
+            max = 1000
+            progress = (luminozitateCurenta.coerceIn(0f, 1f) * 1000).toInt()
+        }
+        root.addView(seekLumina)
+
+        // ---- Volum ----
+        root.addView(TextView(this).apply {
+            text = "Volum"
+            textSize = 15f
+            setTextColor(android.graphics.Color.WHITE)
+        })
+        val seekVolum = android.widget.SeekBar(this).apply {
+            max = 1000
+            progress = (volumCurent.coerceIn(0f, 1f) * 1000).toInt()
+        }
+        root.addView(seekVolum)
+
+        // ---- Rezoluție ----
+        root.addView(TextView(this).apply {
+            text = "Rezoluție"
+            textSize = 15f
+            setTextColor(android.graphics.Color.WHITE)
+        })
+        val opts = listOf(
+            Triple("Auto", 0, 7680 to 4320),
+            Triple("720p", 720, 1280 to 720),
+            Triple("1080p", 1080, 1920 to 1080),
+            Triple("2K (1440p)", 1440, 2560 to 1440),
+            Triple("4K", 2160, 3840 to 2160)
+        )
+        val radio = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+        }
+        val idRes = HashMap<Int, Pair<Int, Pair<Int, Int>>>() // id -> (inaltime, wh)
+        opts.forEach { (nume, h, wh) ->
+            val rb = android.widget.RadioButton(this).apply {
+                text = nume
+                id = View.generateViewId()
+            }
+            radio.addView(rb)
+            idRes[rb.id] = Pair(h, wh)
+            if (h == rezolutieCurenta) rb.isChecked = true
+        }
+        root.addView(radio)
+
+        // ---- Build dialog ----
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("⚙️ Setări")
+            .setView(root)
+            .setNegativeButton("Închide", null)
+            .setPositiveButton("Aplică") { _, _ ->
+                // Luminozitate
+                val lum = seekLumina.progress / 1000f
+                luminozitateCurenta = lum
+                aplicaLumina(lum)
+                adapter?.setBrightness(lum)
+
+                // Volum
+                val vol = seekVolum.progress / 1000f
+                volumCurent = vol
+                adapter?.setVolume(vol)
+
+                // Rezoluție
+                val checked = radio.checkedRadioButtonId
+                val (h, wh) = idRes[checked] ?: (0 to (7680 to 4320))
+                rezolutieCurenta = h
+                adapter?.setResolutie(wh.first, wh.second)
+
+                salveazaSetarileCurente()
+            }
+            .create()
+        dialog.show()
     }
 }

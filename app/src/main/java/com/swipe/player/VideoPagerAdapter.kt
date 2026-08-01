@@ -41,6 +41,10 @@ class VideoPagerAdapter(
     var currentVolume: Float = initialVolume ?: 1f
         set(v) { field = v.coerceIn(0f, 1f); onVolumeChange?.invoke(field) }
 
+    // rezoluție de redare aleasă în setări (Auto = foarte mare)
+    var currentResolutie: Pair<Int, Int> = Pair(7680, 4320) // Auto / acceptă tot
+        set(v) { field = v; aplicaResolutie() }
+
     // playerul activ (vizibil in pager)
     var playerActiv: ExoPlayer? = null
         set(value) {
@@ -97,6 +101,7 @@ class VideoPagerAdapter(
         holder.tvName.text = videoName
 
         val player = ExoPlayer.Builder(context).build()
+        aplicaResolutiaLa(player) // rezoluția aleasă în setări (720p/1080p/2K/4K)
         holder.player = player
         players[position] = player
         holder.playerView.player = player
@@ -309,6 +314,29 @@ class VideoPagerAdapter(
     fun setBrightness(b: Float) {
         currentBrightness = b
         onBrightnessChange?.invoke(currentBrightness)
+    }
+
+    /**
+     * Setați rezoluția de redare (limită maximă a track-ului video decodat).
+     * Se aplică tuturor player-urilor existente și celor viitoare.
+     * Ex: Auto=7680x4320, 4K=3840x2160, 2K=2560x1440, 1080p=1920x1080, 720p=1280x720.
+     */
+    fun setResolutie(w: Int, h: Int) {
+        currentResolutie = Pair(w, h)
+    }
+    private fun aplicaResolutiaLa(player: ExoPlayer) {
+        try {
+            val (w, h) = currentResolutie
+            val params = player.videoTrackSelectionParameters.buildUpon()
+                .setMaxVideoSize(w, h)
+                .build()
+            player.videoTrackSelectionParameters = params
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare aplicare rezoluție", e)
+        }
+    }
+    private fun aplicaResolutie() {
+        for ((_, p) in players) aplicaResolutiaLa(p)
     }
 
     // ===== dublu-tap = play / pause ====
