@@ -46,9 +46,13 @@ class VideoPagerAdapter(
         set(value) { field = value; value?.volume = currentVolume }
 
     // stare drag
-    private var dragMod = 0 // 0=none, 1=volum, 2=luminozitate
+    private var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek (orizontal)
     private var dragStartY = 0f
+    private var dragStartX = 0f
     private var dragStartVal = 0f
+    private var dragStartPosMs = 0L
+    private var seekActive = false
+    private var dragThreshold = 40f // prag activare gest (px), ca Huawei f1()
 
     inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
@@ -100,6 +104,70 @@ class VideoPagerAdapter(
         })
         player.prepare()
         player.playWhenReady = true
+
+        // ===== Gesturi (model Huawei Video: MenuController4GestureSeek) =====
+        // drag orizontal = seek / derulare video; dublu-tap = play/pause
+        val seekGesture = android.view.GestureDetector(
+            context,
+            object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    togglePlay(holder, player)
+                    return true
+                }
+                override fun onDown(e: MotionEvent): Boolean = true
+            }
+        )
+        holder.playerView.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragMod = 0
+                    seekActive = false
+                    dragStartX = event.x
+                    dragStartY = event.y
+                    dragStartVal = dragStartY
+                    dragStartPosMs = player.currentPosition
+                    true // prindem stream-ul ca să observăm direcția gestului
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - dragStartX
+                    val dy = event.y - dragStartY
+                    // dacă gestul e VERTICAL => lăsăm scroll-ul vertical (schimbare videoclip)
+                    // să fie gestionat de ViewPager2; returnăm false ca RecyclerView-ul să preia.
+                    if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+                        dragMod = 0
+                        seekActive = false
+                        return@setOnTouchListener false
+                    }
+                    // altfel => drag orizontal = seek / derulare video (model Huawei U0()/Q0())
+                    if (!seekActive && kotlin.math.abs(dx) < dragThreshold) {
+                        return@setOnTouchListener true
+                    }
+                    dragMod = 3
+                    seekActive = true
+                    val durata = player.duration
+                    if (durata > 0) {
+                        val latimeView = view.width.toFloat().coerceAtLeast(1f)
+                        val factor = durata.toFloat() * (event.x - dragStartX) / latimeView
+                        val viteza = if (durata > 240_000) 4f else 1f // >4min => smooth, ca Huawei
+                        val target = (dragStartPosMs + factor / viteza).toLong()
+                        player.seekTo(target.coerceIn(0L, durata))
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // dacă a fost doar un tap (fără drag), lasă player-ul (controller play/pause)
+                    // și GestureDetector-ul să proceseze (dublu-tap)
+                    if (dragMod == 0) {
+                        seekGesture.onTouchEvent(event)
+                        return@setOnTouchListener playerView.onTouchEvent(event)
+                    }
+                    dragMod = 0
+                    seekActive = false
+                    true
+                }
+                else -> seekGesture.onTouchEvent(event)
+            }
+        }
 
         val esteFav = memoryManager.esteFavorit(videoName)
         holder.btnFav.setImageResource(if (esteFav) android.R.drawable.star_on else android.R.drawable.star_off)
@@ -189,5 +257,23 @@ class VideoPagerAdapter(
     fun setBrightness(b: Float) {
         currentBrightness = b
         onBrightnessChange?.invoke(currentBrightness)
+    }
+
+    // ===== dublu-tap = play / pause (model Huawei LocalGestureViewPager$b) =====
+    private fun togglePlay(holder: VH, player: ExoPlayer) {
+        try {
+            if (player.isPlaying) {
+                player.pause()
+            } else {
+                holder.loadingContainer.visibility = View.GONE
+                player.play()
+            }
+            val nume = names.getOrElse(holder.adapterPosition) { "unknown" }
+            if (!player.isPlaying && player.duration > 0) {
+                salveazaProgres(nume, player, null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare toggle play/pause", e)
+        }
     }
 }
