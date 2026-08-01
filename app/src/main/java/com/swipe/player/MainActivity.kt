@@ -245,25 +245,34 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     // ===== SettingsBottomSheetDialogFragment.Listener =====
-    override fun onSettingsApply(brightness: Float, volume: Float, resolutionH: Int) {
-        // Luminozitate
-        luminozitateCurenta = brightness
-        aplicaLumina(brightness)
-        adapter?.setBrightness(brightness)
-
-        // Volum
-        volumCurent = volume
-        adapter?.setVolume(volume)
-
-        // Rezoluție
-        rezolutieCurenta = resolutionH
-        val (w, h) = rezolutieW(resolutionH)
-        adapter?.setResolutie(w, h)
-
+    // aplicare live, direct pe sistem/player (fără buton "Aplică")
+    override fun onBrightnessChange(brightness: Float) {
+        luminozitateCurenta = brightness.coerceIn(0.15f, 1f)
+        aplicaLumina(luminozitateCurenta)      // native de sistem (pe fereastră)
+        adapter?.setBrightness(luminozitateCurenta)
         salveazaSetarileCurente()
     }
 
-    override fun onSettingsReset() {
+    override fun onVolumeChange(volume: Float) {
+        volumCurent = volume.coerceIn(0f, 1f)
+        adapter?.setVolume(volumCurent)        // aplicat direct pe playerul activ
+        salveazaSetarileCurente()
+    }
+
+    override fun onResolutieChange(resolutionH: Int) {
+        rezolutieCurenta = resolutionH
+        val (w, h) = rezolutieW(resolutionH)
+        adapter?.setResolutie(w, h)
+        salveazaSetarileCurente()
+    }
+
+    override fun onClearHistory() {
+        // șterge doar istoricul de vizionare, NU fișierele locale
+        MemoryManager.getInstance(this).stergeTotIstoricul()
+        Toast.makeText(this, "Istoric vizionare șters", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onReset() {
         // Reset la valori implicite: luminozitate 100%, volum 100%, rezoluție Auto
         luminozitateCurenta = 1f
         volumCurent = 1f
@@ -274,6 +283,5 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val (w, h) = rezolutieW(0)
         adapter?.setResolutie(w, h)
         salveazaSetarileCurente()
-        Toast.makeText(this, "Setări resetate", Toast.LENGTH_SHORT).show()
     }
 }

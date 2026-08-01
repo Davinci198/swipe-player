@@ -11,17 +11,30 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.SeekBar
+import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
+import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 /**
- * Panou de setări (bottom sheet) - luminozitate, volum, rezoluție, Reset.
+ * Panou de setări (bottom sheet) - luminozitate, volum, rezoluție, Reset, Șterge istoric.
+ * Elementele se aplică NATIV / în timp real (fără buton "Aplică"):
+ *  - luminozitate & volum se aplică imediat când se mișcă sliderul
+ *  - rezoluția se aplică la schimbarea selecției
  */
 class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
     interface Listener {
-        fun onSettingsApply(brightness: Float, volume: Float, resolutionH: Int)
-        fun onSettingsReset()
+        /** slider luminozitate, aplicat în timp real (native de sistem, pe fereastră) */
+        fun onBrightnessChange(brightness: Float)
+        /** slider volum, aplicat în timp real pe playerul activ */
+        fun onVolumeChange(volume: Float)
+        /** schimbare rezoluție (Auto=0, 720, 1080) */
+        fun onResolutieChange(resolutionH: Int)
+        /** șterge doar istoricul de vizionare (nu și fișierele locale) */
+        fun onClearHistory()
+        /** reset la valori implicite */
+        fun onReset()
     }
 
     private var listener: Listener? = null
@@ -29,7 +42,6 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private var currentVolume = 1f
     private var currentResH = 0
 
-    /** apelată de MainActivity înainte de show() pentru a propaga starea actuală */
     fun setInitial(brightness: Float, volume: Float, resH: Int) {
         currentBrightness = brightness.coerceIn(0.15f, 1f)
         currentVolume = volume.coerceIn(0f, 1f)
@@ -56,31 +68,47 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             setTextColor(Color.WHITE)
         })
 
-        // ---- Luminozitate ----
-        root.addView(label("Luminozitate"))
+        // ---- Luminozitate (aplicată live, native de sistem) ----
+        root.addView(label("Luminozitate (live)"))
         val seekLumina = SeekBar(requireContext()).apply {
             max = 1000
             progress = (currentBrightness * 1000).toInt()
+            setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    listener?.onBrightnessChange(progress / 1000f)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
         }
         root.addView(seekLumina)
 
-        // ---- Volum ----
-        root.addView(label("Volum"))
+        // ---- Volum (aplicat live pe playerul activ) ----
+        root.addView(label("Volum (live)"))
         val seekVolum = SeekBar(requireContext()).apply {
             max = 1000
             progress = (currentVolume * 1000).toInt()
+            setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    listener?.onVolumeChange(progress / 1000f)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
         }
         root.addView(seekVolum)
 
-        // ---- Rezoluție ----
+        // ---- Rezoluție (aplicată la schimbare) ----
         root.addView(label("Rezoluție"))
         val opts = listOf(
             Triple("Auto", 0, Int.MAX_VALUE to Int.MAX_VALUE),
             Triple("720p", 720, 1280 to 720),
             Triple("1080p", 1080, 1920 to 1080)
         )
-        val radio = RadioGroup(requireContext()).apply { orientation = RadioGroup.VERTICAL }
-        val idRes = HashMap<Int, Pair<Int, Pair<Int, Int>>>()
+        val radio = RadioGroup(requireContext()).apply {
+            orientation = RadioGroup.VERTICAL
+        }
+        val idRes = HashMap<Int, Int>() // id -> inaltime (0, 720, 1080)
         opts.forEach { (nume, h, wh) ->
             val rb = RadioButton(requireContext()).apply {
                 text = nume
@@ -88,35 +116,33 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 id = View.generateViewId()
             }
             radio.addView(rb)
-            idRes[rb.id] = Pair(h, wh)
+            idRes[rb.id] = h
             if (h == currentResH) rb.isChecked = true
+        }
+        radio.setOnCheckedChangeListener { _, checkedId ->
+            val h = idRes[checkedId] ?: 0
+            listener?.onResolutieChange(h)
+            currentResH = h
         }
         root.addView(radio)
 
         // ---- Butoane ----
+        val btnClear = Button(requireContext()).apply {
+            text = "Șterge istoric vizionare"
+            setOnClickListener { listener?.onClearHistory() }
+        }
+        root.addView(btnClear)
+
         val btnReset = Button(requireContext()).apply {
             text = "Reset"
             setOnClickListener {
-                currentBrightness = 1f; currentVolume = 1f
+                currentBrightness = 1f; currentVolume = 1f; currentResH = 0
                 seekLumina.progress = 1000; seekVolum.progress = 1000
-                listener?.onSettingsReset()
+                listener?.onReset()
+                Toast.makeText(requireContext(), "Setări resetate", Toast.LENGTH_SHORT).show()
             }
         }
         root.addView(btnReset)
-
-        val btnApply = Button(requireContext()).apply {
-            text = "Aplică"
-            setOnClickListener {
-                val lum = seekLumina.progress / 1000f
-                val vol = seekVolum.progress / 1000f
-                val checked = radio.checkedRadioButtonId
-                val (h, _) = idRes[checked] ?: (0 to (Int.MAX_VALUE to Int.MAX_VALUE))
-                currentBrightness = lum; currentVolume = vol; currentResH = h
-                listener?.onSettingsApply(lum, vol, h)
-                dismiss()
-            }
-        }
-        root.addView(btnApply)
 
         return root
     }

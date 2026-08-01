@@ -41,12 +41,12 @@
             android:backgroundTint="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Buton setari: dreapta jos (evita zona de Back Swipe din stanga sus) -->
+    <!-- Buton setari: colt stanga jos -->
     <ImageButton
         android:id="@+id/btnSettings"
         android:layout_width="56dp"
         android:layout_height="56dp"
-        android:layout_gravity="bottom|end"
+        android:layout_gravity="bottom|start"
         android:layout_margin="20dp"
         android:contentDescription="Setări"
         android:background="@drawable/bg_settings"

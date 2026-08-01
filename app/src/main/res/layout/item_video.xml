@@ -42,7 +42,7 @@
         android:id="@+id/btnFavorite"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="bottom|right"
+        android:layout_gravity="top|end"
         android:layout_margin="20dp"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
