@@ -8,13 +8,15 @@ Player video vertical (TikTok-style) cu accelerație hardware DragonBones C++ na
 SwipePlayer/
 ├── app/
 │   ├── src/main/
-│   │   ├── java/com/swipeplayer/
-│   │   │   ├── MainActivity.java
+│   │   ├── java/com/swipe/player/
+│   │   │   ├── MainActivity.kt
+│   │   │   ├── VideoPagerAdapter.kt
+│   │   │   ├── MemoryManager.kt
 │   │   │   └── DragonBonesBridge.java
 │   │   ├── cpp/
 │   │   │   ├── CMakeLists.txt
-│   │   │   ├── dragonBones/   (sursa C++)
-│   │   │   └── jni/           (JNI bridge)
+│   │   │   ├── jni/           (JNI bridge)
+│   │   │   └── dragonBones/   (sursa C++)
 │   │   ├── res/
 │   │   ├── assets/
 │   │   └── AndroidManifest.xml

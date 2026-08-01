@@ -681,3 +681,23 @@ Java_com_dragonbones_JniBridge_stopAnimation(JNIEnv *env, jclass clazz, jstring 
     LOGI("Stopping animation: '%s' via JNI call.", name.c_str());
     instance->armature->getAnimation()->stop(name);
 }
+
+// ============================================================
+// Bridge pentru aplicația principală (com.swipe.player)
+// Expune versiunea și inițializarea pentru DragonBonesBridge.java
+// pentru a evita UnsatisfiedLinkError la runtime.
+// ============================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_swipe_player_DragonBonesBridge_nativeGetVersion(JNIEnv *env, jclass /*clazz*/) {
+    LOGI("DragonBonesBridge nativeGetVersion called");
+    return env->NewStringUTF("1.0.0-ndk27");
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_swipe_player_DragonBonesBridge_nativeInit(JNIEnv *env, jclass clazz) {
+    LOGI("DragonBonesBridge nativeInit called");
+    // Delegăm la inițializarea reală a DragonBones
+    Java_com_dragonbones_JniBridge_init(env, clazz);
+    return JNI_TRUE;
+}

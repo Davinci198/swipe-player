@@ -19,7 +19,8 @@ import androidx.media3.exoplayer.ExoPlayer
 class VideoPagerAdapter(
     private val context: Context,
     private val items: List<String>,
-    private val names: List<String> = items.map { it.substringAfterLast("/").substringBefore("?") }
+    private val names: List<String> = items.map { it.substringAfterLast("/").substringBefore("?") },
+    private val initialVolume: Float? = null
 ) : RecyclerView.Adapter<VideoPagerAdapter.VH>() {
     private val TAG = "VideoPagerAdapter"
     private val memoryManager: MemoryManager by lazy {
@@ -49,6 +50,10 @@ class VideoPagerAdapter(
         val player = ExoPlayer.Builder(context).build()
         holder.player = player
         holder.playerView.player = player
+
+        // Aplică volumul salvat din setări (dacă există)
+        initialVolume?.let { player.volume = it }
+
         val mediaItem = MediaItem.fromUri(url)
         player.setMediaItem(mediaItem)
 
@@ -67,6 +72,15 @@ class VideoPagerAdapter(
                         salveazaProgres(videoName, player, 100)
                     }
                 }
+            }
+            // Salvare periodică a progresului în timpul redării
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    salveazaProgresDacaTimpul(videoName, player)
+                }
+            }
+            override fun onPositionDiscontinuity() {
+                salveazaProgresDacaTimpul(videoName, player)
             }
             override fun onPlayerError(error: PlaybackException) {
                 holder.loadingContainer.visibility = View.GONE

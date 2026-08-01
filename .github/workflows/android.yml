@@ -101,7 +101,7 @@ jobs:
           case "${BUILD_VARIANT:-debug}" in
             clone) TASK=":app:assembleCloneDebug" ;;
             release) TASK=":app:assembleRelease" ;;
-            debug|*) TASK=":app:assembleMainDebug" ;;
+            debug|*) TASK=":app:assembleOriginalDebug" ;;
           esac
           
           echo "Running: gradle $TASK"
