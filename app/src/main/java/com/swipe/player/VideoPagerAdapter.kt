@@ -52,7 +52,7 @@ class VideoPagerAdapter(
     private var dragStartVal = 0f
     private var dragStartPosMs = 0L
     private var seekActive = false
-    private var dragThreshold = 40f // prag activare gest (px), ca Huawei f1()
+    private var dragThreshold = 40f // prag activare gest (px)
 
     inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
@@ -105,7 +105,7 @@ class VideoPagerAdapter(
         player.prepare()
         player.playWhenReady = true
 
-        // ===== Gesturi (model Huawei Video: MenuController4GestureSeek) =====
+        // ===== Gesturi: drag orizontal = seek, dublu-tap = play/pause =====
         // drag orizontal = seek / derulare video; dublu-tap = play/pause
         val seekGesture = android.view.GestureDetector(
             context,
@@ -138,7 +138,7 @@ class VideoPagerAdapter(
                         seekActive = false
                         return@setOnTouchListener false
                     }
-                    // altfel => drag orizontal = seek / derulare video (model Huawei U0()/Q0())
+                    // altfel => drag orizontal = seek / derulare video
                     if (!seekActive && kotlin.math.abs(dx) < dragThreshold) {
                         return@setOnTouchListener true
                     }
@@ -148,7 +148,7 @@ class VideoPagerAdapter(
                     if (durata > 0) {
                         val latimeView = view.width.toFloat().coerceAtLeast(1f)
                         val factor = durata.toFloat() * (event.x - dragStartX) / latimeView
-                        val viteza = if (durata > 240_000) 4f else 1f // >4min => smooth, ca Huawei
+                        val viteza = if (durata > 240_000) 4f else 1f // clipuri lungi => netezit
                         val target = (dragStartPosMs + factor / viteza).toLong()
                         player.seekTo(target.coerceIn(0L, durata))
                     }
@@ -259,7 +259,7 @@ class VideoPagerAdapter(
         onBrightnessChange?.invoke(currentBrightness)
     }
 
-    // ===== dublu-tap = play / pause (model Huawei LocalGestureViewPager$b) =====
+    // ===== dublu-tap = play / pause ====
     private fun togglePlay(holder: VH, player: ExoPlayer) {
         try {
             if (player.isPlaying) {
