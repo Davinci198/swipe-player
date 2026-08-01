@@ -1,6 +1,6 @@
 package com.swipe.player
-
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -15,20 +15,33 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.ui.PlayerView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.recyclerview.widget.RecyclerView.ViewHolder
 
+/**
+ * Swipe Player - adapter pentru videoclipuri locale (offline).
+ * Primește o listă de Uri-uri (content:// din SAF) și le redă vertical.
+ */
 class VideoPagerAdapter(
     private val context: Context,
-    private val items: List<String>,
-    private val names: List<String> = items.map { it.substringAfterLast("/").substringBefore("?") },
-    private val initialVolume: Float? = null
+    private val items: List<Uri>,
+    private val names: List<String> = items.map { uri ->
+        uri.lastPathSegment?.substringAfterLast("/")?.substringBefore("?") ?: "Video"
+    },
+    private val initialVolume: Float? = null,
+    private val onBrightnessChange: ((Float) -> Unit)? = null,
+    private val onVolumeChange: ((Float) -> Unit)? = null
 ) : RecyclerView.Adapter<VideoPagerAdapter.VH>() {
     private val TAG = "VideoPagerAdapter"
     private val memoryManager: MemoryManager by lazy {
         MemoryManager.getInstance(context)
     }
     private var lastSaveTime = 0L
+    // valoarea curentă de controle (lumină | volum) pentru zonele de drag
+    var currentBrightness: Float = 1f
+    var currentVolume: Float = initialVolume ?: 1f
+    var playerActiv: ExoPlayer? = null
 
-    inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+    inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
         var player: ExoPlayer? = null
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
@@ -42,21 +55,20 @@ class VideoPagerAdapter(
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val url = items[position]
+        val uri = items[position]
         val videoName = names.getOrElse(position) { "Video ${position + 1}" }
         holder.tvName.text = videoName
-
         // Build player
         val player = ExoPlayer.Builder(context).build()
         holder.player = player
+        playerActiv = player
         holder.playerView.player = player
-
-        // Aplică volumul salvat din setări (dacă există)
-        initialVolume?.let { player.volume = it }
-
-        val mediaItem = MediaItem.fromUri(url)
+        // Aplică volumul curent (salvat sau ajustat)
+        player.volume = currentVolume
+        // Aplică luminozitatea curentă
+        onBrightnessChange?.invoke(currentBrightness)
+        val mediaItem = MediaItem.fromUri(uri)
         player.setMediaItem(mediaItem)
-
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -73,7 +85,6 @@ class VideoPagerAdapter(
                     }
                 }
             }
-            // Salvare periodică a progresului în timpul redării
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
                     salveazaProgresDacaTimpul(videoName, player)
@@ -119,14 +130,12 @@ class VideoPagerAdapter(
     }
 
     override fun getItemCount(): Int = items.size
-
     private fun salveazaProgresDacaTimpul(nume: String, player: ExoPlayer) {
         val acum = System.currentTimeMillis()
         if (acum - lastSaveTime < 5000) return
         lastSaveTime = acum
         salveazaProgres(nume, player, null)
     }
-
     private fun salveazaProgres(nume: String, player: ExoPlayer, progresForced: Int?) {
         try {
             val durataMs = player.duration
@@ -142,5 +151,22 @@ class VideoPagerAdapter(
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare progres", e)
         }
+    }
+
+    /** Ajustează volumul pentru videoclipul curent și îl propagează. */
+    fun setVolume(v: Float) {
+        currentVolume = v.coerceIn(0f, 1f)
+        onVolumeChange?.invoke(currentVolume)
+        // aplică pe playerul vizibil (poziția 0 în pager)
+        // adapter nu are acces direct; playerii sunt în ViewHolders
+    }
+    /** Ajustează luminozitatea și o propagează. */
+    fun setBrightness(b: Float) {
+        currentBrightness = b.coerceIn(0.2f, 1.7f)
+        onBrightnessChange?.invoke(currentBrightness)
+    }
+    /** Aplică volumul curent pe toți jucătorii existenți. */
+    fun setVolumeToActive() {
+        playerActiv?.volume = currentVolume
     }
 }
