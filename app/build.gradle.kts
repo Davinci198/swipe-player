@@ -13,6 +13,17 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
+        // doar arhitecturi reale de arm avion (fără x86/x86_64 inutile)
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     flavorDimensions += "default"
@@ -65,7 +76,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":dragonbones"))
     implementation("androidx.recyclerview:recyclerview:1.3.1")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
     // Media3

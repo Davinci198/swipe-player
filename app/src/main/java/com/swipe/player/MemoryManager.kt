@@ -62,22 +62,29 @@ class MemoryManager private constructor(context: Context) {
     ) {
         try {
             val arr = getJsonArray(KEY_HISTORY)
+            val data = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+
+            // UPSERT: dacă videoul există deja, actualizăm poziția (nu append negrăbit)
+            var index = -1
+            for (i in 0 until arr.length()) {
+                if (arr.getJSONObject(i).optString("nume", "") == nume) { index = i; break }
+            }
             val entry = JSONObject().apply {
                 put("nume", nume)
-                put("data", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date()))
+                put("data", data)
                 put("progres", progres.coerceIn(0, 100))
                 put("pozitie", pozitieSecunde)
                 put("durata", durataSecunde)
             }
-            arr.put(entry)
+            if (index >= 0) arr.put(index, entry) else arr.put(entry)
 
-            // Limitare la MAX_HISTORY
+            // Limitare strictă la MAX_HISTORY (împiedică creșterea infinită)
             while (arr.length() > MAX_HISTORY) {
                 arr.remove(0)
             }
 
             putJsonArray(KEY_HISTORY, arr)
-            Log.d(TAG, "Salvat istoric: $nume ($progres%)")
+            Log.d(TAG, "Salvat istoric(${if (index >= 0) "update" else "nou"}): $nume ($progres%)")
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare istoric", e)
         }

@@ -38,7 +38,7 @@ class VideoPagerAdapter(
     private var lastSaveTime = 0L
 
     var currentBrightness: Float = 1f
-        set(v) { field = v.coerceIn(0.2f, 1.7f) }
+        set(v) { field = v.coerceIn(0.15f, 1f) } // max 1.0 (screenBrightness)
     var currentVolume: Float = initialVolume ?: 1f
         set(v) { field = v.coerceIn(0f, 1f); onVolumeChange?.invoke(field) }
 
@@ -54,7 +54,7 @@ class VideoPagerAdapter(
         set(value) {
             field = value
             // opreste toate celelalte videoclipuri (audio + redare) - sa nu se auda in fundal
-            for ((_, p) in players) {
+            for (p in live.values) {
                 if (p !== value) {
                     p.volume = 0f
                     p.pause()
@@ -67,22 +67,31 @@ class VideoPagerAdapter(
             }
         }
 
-    // toti playerii creati, pe pozitie (pentru controlul videoclipului activ)
-    private val players = HashMap<Int, ExoPlayer>()
+    // playerii aflați în uz, pe poziție
+    private val live = HashMap<Int, ExoPlayer>()
+
+    // pool de ExoPlayer refolosiți (evită crearea a 100+ jucători pt. 100 de videoclipuri)
+    private val pool = java.util.ArrayDeque<ExoPlayer>()
+    private val MAX_POOL = 3
+
+    private fun acquirePlayer(): ExoPlayer {
+        val p = if (pool.isNotEmpty()) pool.removeFirst()
+        else ExoPlayer.Builder(context).setTrackSelector(trackSelector).build()
+        p.clearMediaItems()
+        return p
+    }
+
+    private fun releasePlayer(p: ExoPlayer) {
+        p.stop()
+        p.clearMediaItems()
+        p.playWhenReady = false
+        if (pool.size < MAX_POOL) pool.addLast(p) else p.release()
+    }
 
     private val SEEK_STEP_MS = 10_000L // swipe orizontal = derulare in pas de 10 sec
 
     // pagina (poziția) considerată vizibilă/activă - pornește doar ea
     private var activePosition = -1
-
-    // stare drag
-    private var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek (orizontal)
-    private var dragStartY = 0f
-    private var dragStartX = 0f
-    private var dragStartVal = 0f
-    private var dragStartPosMs = 0L
-    private var seekActive = false
-    private var dragThreshold = 40f // prag activare gest (px)
 
     inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
@@ -90,6 +99,15 @@ class VideoPagerAdapter(
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
+
+        // stare drag - locală pe ViewHolder (fără race condition între pagini)
+        var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
+        var dragStartX = 0f
+        var dragStartY = 0f
+        var dragStartVal = 0f
+        var dragStartPosMs = 0L
+        var seekActive = false
+        val dragThreshold = 40f // prag activare gest (px)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -102,9 +120,9 @@ class VideoPagerAdapter(
         val videoName = names.getOrElse(position) { "Video ${position + 1}" }
         holder.tvName.text = videoName
 
-        val player = ExoPlayer.Builder(context).setTrackSelector(trackSelector).build()
+        val player = acquirePlayer() // reutilizat din pool (max 3)
         holder.player = player
-        players[position] = player
+        live[position] = player
         holder.playerView.player = player
         holder.playerView.setControllerShowTimeoutMs(2000) // controllerul dispare mai repede
         // NU pornim automat - doar videoclipul activ porneste (prin setActivePage)
@@ -176,34 +194,35 @@ class VideoPagerAdapter(
         val limitaStanga = 0.42f
         val limitaDreapta = 0.58f
 
-        holder.playerView.setOnTouchListener { view, event ->
+        val h = holder // referință locală pentru readabilitate
+        h.playerView.setOnTouchListener { view, event ->
             gesture.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    dragMod = 0
-                    seekActive = false
-                    dragStartX = event.x
-                    dragStartY = event.y
-                    dragStartVal = dragStartY
-                    dragStartPosMs = player.currentPosition
+                    h.dragMod = 0
+                    h.seekActive = false
+                    h.dragStartX = event.x
+                    h.dragStartY = event.y
+                    h.dragStartVal = event.y
+                    h.dragStartPosMs = player.currentPosition
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    when (dragMod) {
+                    when (h.dragMod) {
                         // încă nedecis: stabilim direcția gestului
                         0 -> {
-                            val dx = event.x - dragStartX
-                            val dy = event.y - dragStartY
+                            val dx = event.x - h.dragStartX
+                            val dy = event.y - h.dragStartY
                             val orizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
                             if (orizontal) {
-                                if (kotlin.math.abs(dx) < dragThreshold) return@setOnTouchListener true
-                                dragMod = 3 // seek
+                                if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
+                                h.dragMod = 3 // seek
                                 view.parent?.requestDisallowInterceptTouchEvent(true)
                             } else {
-                                if (kotlin.math.abs(dy) < dragThreshold) return@setOnTouchListener true
+                                if (kotlin.math.abs(dy) < h.dragThreshold) return@setOnTouchListener true
                                 val raportX = event.x / view.width.toFloat().coerceAtLeast(1f)
                                 view.parent?.requestDisallowInterceptTouchEvent(false)
-                                dragMod = when {
+                                h.dragMod = when {
                                     raportX < limitaStanga -> 2 // luminozitate
                                     raportX > limitaDreapta -> 1 // volum
                                     else -> 4 // scroll vertical => lasă ViewPager2
@@ -212,15 +231,15 @@ class VideoPagerAdapter(
                         }
                         2 -> { // luminozitate
                             view.parent?.requestDisallowInterceptTouchEvent(true)
-                            val delta = (dragStartY - event.y) / (view.height.toFloat() * 1.6f)
-                            currentBrightness = (dragStartVal + delta).coerceIn(0.2f, 1.7f)
+                            val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            currentBrightness = (h.dragStartVal + delta).coerceIn(0.15f, 1f)
                             onBrightnessChange?.invoke(currentBrightness)
                             return@setOnTouchListener true
                         }
                         1 -> { // volum
                             view.parent?.requestDisallowInterceptTouchEvent(true)
-                            val delta = (dragStartY - event.y) / (view.height.toFloat() * 1.6f)
-                            currentVolume = (dragStartVal + delta).coerceIn(0f, 1f)
+                            val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            currentVolume = (h.dragStartVal + delta).coerceIn(0f, 1f)
                             playerActiv?.volume = currentVolume
                             onVolumeChange?.invoke(currentVolume)
                             return@setOnTouchListener true
@@ -228,8 +247,8 @@ class VideoPagerAdapter(
                         3 -> { // seek orizontal, pași de 10s
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                val pas = ((event.x - dragStartX) / 15f).toInt()
-                                val target = dragStartPosMs + pas * SEEK_STEP_MS
+                                val pas = ((event.x - h.dragStartX) / 15f).toInt()
+                                val target = h.dragStartPosMs + pas * SEEK_STEP_MS
                                 player.seekTo(target.coerceIn(0L, durata))
                             }
                             return@setOnTouchListener true
@@ -239,9 +258,9 @@ class VideoPagerAdapter(
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val eraScroll = dragMod == 4
-                    dragMod = 0
-                    seekActive = false
+                    val eraScroll = h.dragMod == 4
+                    h.dragMod = 0
+                    h.seekActive = false
                     if (eraScroll) false else true
                 }
                 else -> true
@@ -263,11 +282,12 @@ class VideoPagerAdapter(
         if (position != RecyclerView.NO_POSITION) {
             val videoName = names.getOrElse(position) { "unknown" }
             holder.player?.let { salveazaProgres(videoName, it, null) }
-            players.remove(position)
+            live.remove(position)
         }
         holder.playerView.player = null
-        holder.player?.run { stop(); release() }
-        if (playerActiv === holder.player) playerActiv = null
+        val p = holder.player
+        if (playerActiv === p) playerActiv = null
+        if (p != null) releasePlayer(p) // return în pool, nu eliberăm neapărat
         holder.player = null
     }
 
@@ -277,7 +297,7 @@ class VideoPagerAdapter(
      */
     fun setActivePage(position: Int) {
         activePosition = position
-        val player = players[position]
+        val player = live[position]
         if (player != null) playerActiv = player
     }
 

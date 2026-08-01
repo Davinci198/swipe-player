@@ -1,11 +1,9 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Swipe Player - ProGuard rules
 
-# Keep DragonBones native methods
--keepclasseswithmembernames class * {
-    native <methods>;
+# Media3 ExoPlayer: păstrăm clasele folosite de decoder/renderer
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+-keepattributes *Annotation*, InnerClasses, Signature, MethodParameters
+-keepclassmembers class * {
+    @androidx.media3.common.util.UnstableApi <methods>;
 }

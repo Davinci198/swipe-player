@@ -26,7 +26,7 @@ import androidx.viewpager2.widget.ViewPager2
  * - Drag pe marginea stanga: luminozitate / dreapta: volum
  * - Lista de videoclipuri este persistata; se restaureaza la repornire
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.Listener {
     private val TAG = "MainActivity"
     private val REQUEST_VIDEOS = 1001
     private val REQUEST_PERMS = 1002
@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         viewPager = findViewById(R.id.viewPager)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-        // Buton setari (colt stanga sus)
+        // Buton setari (colț dreapta jos - evită back-swipe din stânga sus)
         val btnSettings = findViewById<android.widget.ImageButton>(R.id.btnSettings)
         btnSettings.setOnClickListener { deschideSetari() }
 
@@ -155,12 +155,8 @@ class MainActivity : AppCompatActivity() {
         )
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
-        // aplica rezoluția salvată (0=Auto, 720, 1080, 1440/2K, 2160/4K)
-        var (rw, rh) = rezolutieW(rezolutieCurenta)
-        if (rw >= 3840 && !isDeviceSuports4K()) {
-            rw = 1920; rh = 1080; rezolutieCurenta = 1080
-            Toast.makeText(this, "Echipamentul nu suportă 4K → 1080p", Toast.LENGTH_SHORT).show()
-        }
+        // aplică rezoluția salvată (Auto / 720p / 1080p)
+        val (rw, rh) = rezolutieW(rezolutieCurenta)
         if (rw > 0) nouAdapter.setResolutie(rw, rh)
         adapter = nouAdapter
         viewPager.adapter = nouAdapter
@@ -240,99 +236,44 @@ class MainActivity : AppCompatActivity() {
     private fun rezolutieW(h: Int): Pair<Int, Int> = when (h) {
         720 -> Pair(1280, 720)
         1080 -> Pair(1920, 1080)
-        1440 -> Pair(2560, 1440) // 2K
-        2160 -> Pair(3840, 2160) // 4K
-        else -> Pair(7680, 4320) // Auto
+        else -> Pair(Int.MAX_VALUE, Int.MAX_VALUE) // Auto => fără limită
     }
     private fun deschideSetari() {
-        val mm = MemoryManager.getInstance(this)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(64, 32, 64, 32)
-        }
+        val sheet = SettingsBottomSheetDialogFragment()
+        sheet.setInitial(luminozitateCurenta, volumCurent, rezolutieCurenta)
+        sheet.show(supportFragmentManager, "settings_sheet")
+    }
 
-        // ---- Luminozitate ----
-        root.addView(TextView(this).apply {
-            text = "Luminozitate"
-            textSize = 15f
-            setTextColor(android.graphics.Color.WHITE)
-        })
-        val seekLumina = android.widget.SeekBar(this).apply {
-            max = 1000
-            progress = (luminozitateCurenta.coerceIn(0f, 1f) * 1000).toInt()
-        }
-        root.addView(seekLumina)
+    // ===== SettingsBottomSheetDialogFragment.Listener =====
+    override fun onSettingsApply(brightness: Float, volume: Float, resolutionH: Int) {
+        // Luminozitate
+        luminozitateCurenta = brightness
+        aplicaLumina(brightness)
+        adapter?.setBrightness(brightness)
 
-        // ---- Volum ----
-        root.addView(TextView(this).apply {
-            text = "Volum"
-            textSize = 15f
-            setTextColor(android.graphics.Color.WHITE)
-        })
-        val seekVolum = android.widget.SeekBar(this).apply {
-            max = 1000
-            progress = (volumCurent.coerceIn(0f, 1f) * 1000).toInt()
-        }
-        root.addView(seekVolum)
+        // Volum
+        volumCurent = volume
+        adapter?.setVolume(volume)
 
-        // ---- Rezoluție ----
-        root.addView(TextView(this).apply {
-            text = "Rezoluție"
-            textSize = 15f
-            setTextColor(android.graphics.Color.WHITE)
-        })
-        val opts = listOf(
-            Triple("Auto", 0, 7680 to 4320),
-            Triple("720p", 720, 1280 to 720),
-            Triple("1080p", 1080, 1920 to 1080),
-            Triple("2K (1440p)", 1440, 2560 to 1440),
-            Triple("4K", 2160, 3840 to 2160)
-        )
-        val radio = android.widget.RadioGroup(this).apply {
-            orientation = android.widget.RadioGroup.VERTICAL
-        }
-        val idRes = HashMap<Int, Pair<Int, Pair<Int, Int>>>() // id -> (inaltime, wh)
-        opts.forEach { (nume, h, wh) ->
-            val rb = android.widget.RadioButton(this).apply {
-                text = nume
-                id = View.generateViewId()
-            }
-            radio.addView(rb)
-            idRes[rb.id] = Pair(h, wh)
-            if (h == rezolutieCurenta) rb.isChecked = true
-        }
-        root.addView(radio)
+        // Rezoluție
+        rezolutieCurenta = resolutionH
+        val (w, h) = rezolutieW(resolutionH)
+        adapter?.setResolutie(w, h)
 
-        // ---- Build dialog ----
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle("⚙️ Setări")
-            .setView(root)
-            .setNegativeButton("Închide", null)
-            .setPositiveButton("Aplică") { _, _ ->
-                // Luminozitate
-                val lum = seekLumina.progress / 1000f
-                luminozitateCurenta = lum
-                aplicaLumina(lum)
-                adapter?.setBrightness(lum)
+        salveazaSetarileCurente()
+    }
 
-                // Volum
-                val vol = seekVolum.progress / 1000f
-                volumCurent = vol
-                adapter?.setVolume(vol)
-
-                // Rezoluție (4K pe dispozitive slabe => fallback la 1080p + toast)
-                val checked = radio.checkedRadioButtonId
-                var (h, wh) = idRes[checked] ?: (0 to (7680 to 4320))
-                if (wh.first >= 3840 && !isDeviceSuports4K()) {
-                    h = 1080; wh = 1920 to 1080
-                    Toast.makeText(this, "Echipamentul nu suportă 4K → 1080p", Toast.LENGTH_SHORT).show()
-                }
-                rezolutieCurenta = h
-                adapter?.setResolutie(wh.first, wh.second)
-
-                salveazaSetarileCurente()
-            }
-            .create()
-        dialog.show()
+    override fun onSettingsReset() {
+        // Reset la valori implicite: luminozitate 100%, volum 100%, rezoluție Auto
+        luminozitateCurenta = 1f
+        volumCurent = 1f
+        rezolutieCurenta = 0
+        aplicaLumina(1f)
+        adapter?.setBrightness(1f)
+        adapter?.setVolume(1f)
+        val (w, h) = rezolutieW(0)
+        adapter?.setResolutie(w, h)
+        salveazaSetarileCurente()
+        Toast.makeText(this, "Setări resetate", Toast.LENGTH_SHORT).show()
     }
 }
