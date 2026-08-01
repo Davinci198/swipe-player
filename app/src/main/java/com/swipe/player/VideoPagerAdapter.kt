@@ -159,7 +159,7 @@ class VideoPagerAdapter(
                     // și GestureDetector-ul să proceseze (dublu-tap)
                     if (dragMod == 0) {
                         seekGesture.onTouchEvent(event)
-                        return@setOnTouchListener playerView.onTouchEvent(event)
+                        return@setOnTouchListener view.onTouchEvent(event)
                     }
                     dragMod = 0
                     seekActive = false
