@@ -7,13 +7,13 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_swipeplayer_DragonBonesBridge_nativeGetVersion(JNIEnv *env, jobject /*thiz*/) {
+Java_com_swipe_player_DragonBonesBridge_nativeGetVersion(JNIEnv *env, jobject /*thiz*/) {
     LOGI("DragonBones native library loaded");
     return env->NewStringUTF("1.0.0-ndk27");
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_swipeplayer_DragonBonesBridge_nativeInit(JNIEnv *env, jobject /*thiz*/) {
+Java_com_swipe_player_DragonBonesBridge_nativeInit(JNIEnv *env, jobject /*thiz*/) {
     LOGI("DragonBones native init OK");
     return JNI_TRUE;
 }

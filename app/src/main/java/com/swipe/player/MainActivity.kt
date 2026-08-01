@@ -12,6 +12,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var viewPager: ViewPager2
     private lateinit var memoryManager: MemoryManager
+    private var volumCurent: Float = 1f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +27,7 @@ class MainActivity : AppCompatActivity() {
         // Încărcare setări salvate (volum, luminozitate)
         val setari = memoryManager.incarcaSetari()
         if (setari != null) {
+            volumCurent = setari.first
             Log.i(TAG, "Setări restaurate: volum=${setari.first}, lumina=${setari.second}")
         }
 
@@ -36,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         viewPager.orientation = ViewPager2.ORIENTATION_VERTICAL
-        viewPager.adapter = VideoPagerAdapter(this, videos)
+        viewPager.adapter = VideoPagerAdapter(this, videos, initialVolume = volumCurent)
 
         // Init native DragonBones bridge
         val ok = try { DragonBonesBridge.init() } catch (e: UnsatisfiedLinkError) { Log.w(TAG, "DragonBones native not available"); false }
@@ -59,13 +61,29 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Salvăm setările curente când aplicația intră în background
-        // În practică, volume/brightness sunt per-instance, le salvăm acum
+        // Salvăm setările curente (volum, luminozitate) când aplicația intră în background
+        salveazaSetarileCurente()
         Log.d(TAG, "Aplicația intră în pauză — memoria e persistentă")
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // Salvează setările la distrugere (finală) pentru siguranță
+        salveazaSetarileCurente()
         Log.d(TAG, "Aplicația se distruge — datele sunt în SharedPreferences")
+    }
+
+    /**
+     * Salvează setările curente de redare în memoria persistentă.
+     * Luminozitatea rămâne implicită (1.0) deoarece playerul video nu o gestionează;
+     * logica de volum este persistată și reaplicată la fiecare pornire.
+     */
+    private fun salveazaSetarileCurente() {
+        try {
+            memoryManager.salveazaSetari(volumCurent, 1f)
+            Log.d(TAG, "Setări salvate: volum=$volumCurent")
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare salvare setări", e)
+        }
     }
 }
