@@ -149,6 +149,15 @@ class MainActivity : AppCompatActivity() {
         nouAdapter.currentVolume = volumCurent
         adapter = nouAdapter
         viewPager.adapter = nouAdapter
+
+        // Când se schimbă pagina vizibilă => oprește celelalte videoclipuri, pornește pe cel nou
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                nouAdapter.setActivePage(position)
+            }
+        })
+        nouAdapter.setActivePage(0) // doar primul videoclip pornește, restul rămân oprite
+
         aplicaLumina(luminozitateCurenta)
         val st = MemoryManager.getInstance(this).getStatistici()
         tvStatus.text = "🎬 ${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"

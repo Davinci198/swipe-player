@@ -43,7 +43,29 @@ class VideoPagerAdapter(
 
     // playerul activ (vizibil in pager)
     var playerActiv: ExoPlayer? = null
-        set(value) { field = value; value?.volume = currentVolume }
+        set(value) {
+            field = value
+            // opreste toate celelalte videoclipuri (audio + redare) - sa nu se auda in fundal
+            for ((_, p) in players) {
+                if (p !== value) {
+                    p.volume = 0f
+                    p.pause()
+                }
+            }
+            value?.apply {
+                volume = currentVolume
+                playWhenReady = true
+                play()
+            }
+        }
+
+    // toti playerii creati, pe pozitie (pentru controlul videoclipului activ)
+    private val players = HashMap<Int, ExoPlayer>()
+
+    private val SEEK_STEP_MS = 10_000L // swipe orizontal = derulare in pas de 10 sec
+
+    // pagina (poziția) considerată vizibilă/activă - pornește doar ea
+    private var activePosition = -1
 
     // stare drag
     private var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek (orizontal)
@@ -76,9 +98,10 @@ class VideoPagerAdapter(
 
         val player = ExoPlayer.Builder(context).build()
         holder.player = player
-        playerActiv = player
+        players[position] = player
         holder.playerView.player = player
-        player.volume = currentVolume
+        // NU pornim automat - doar videoclipul activ porneste (prin setActivePage)
+        player.volume = 0f
         onBrightnessChange?.invoke(currentBrightness)
 
         val mediaItem = MediaItem.fromUri(uri)
@@ -102,8 +125,24 @@ class VideoPagerAdapter(
                 Log.e(TAG, "Error $videoName: ${error.message}")
             }
         })
+        // continuă de unde ai rămas? restaurez poziția salvată, dar NU pornesc automat
+        try {
+            val istoric = memoryManager.getIstoric(videoName)
+            if (istoric.isNotEmpty()) {
+                val durataMs = player.duration
+                val poz = (istoric.last()["pozitie"] as? Int ?: 0) * 1000L
+                if (poz > 0 && (durataMs <= 0 || poz < durataMs - 2000)) {
+                    player.seekTo(poz)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare restaurare progres", e)
+        }
         player.prepare()
-        player.playWhenReady = true
+        // NU pornim automat: doar videoclipul activ pornește (pagina selectată)
+        if (position == activePosition && player !== playerActiv) {
+            playerActiv = player
+        }
 
         // ===== Gesturi: drag orizontal = seek, dublu-tap = play/pause =====
         // drag orizontal = seek / derulare video; dublu-tap = play/pause
@@ -144,12 +183,11 @@ class VideoPagerAdapter(
                     }
                     dragMod = 3
                     seekActive = true
-                    val durata = player.duration
+                    val durata = player.duration.coerceAtLeast(0L)
                     if (durata > 0) {
-                        val latimeView = view.width.toFloat().coerceAtLeast(1f)
-                        val factor = durata.toFloat() * (event.x - dragStartX) / latimeView
-                        val viteza = if (durata > 240_000) 4f else 1f // clipuri lungi => netezit
-                        val target = (dragStartPosMs + factor / viteza).toLong()
+                        // swife orizontal = derulare în pași de exact 10 sec (SEEK_STEP_MS)
+                        val pas = ((event.x - dragStartX) / 15f).toInt()
+                        val target = dragStartPosMs + pas * SEEK_STEP_MS
                         player.seekTo(target.coerceIn(0L, durata))
                     }
                     true
@@ -177,9 +215,10 @@ class VideoPagerAdapter(
         }
 
         // drag luminozitate (stanga)
-        holder.brightZone.setOnTouchListener { _, event ->
+        holder.brightZone.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    view.parent?.requestDisallowInterceptTouchEvent(true) // preia gestul de la ViewPager2
                     dragMod = 2; dragStartY = event.y; dragStartVal = currentBrightness; true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -194,9 +233,10 @@ class VideoPagerAdapter(
             }
         }
         // drag volum (dreapta)
-        holder.volZone.setOnTouchListener { _, event ->
+        holder.volZone.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    view.parent?.requestDisallowInterceptTouchEvent(true) // preia gestul de la ViewPager2
                     dragMod = 1; dragStartY = event.y; dragStartVal = currentVolume; true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -219,10 +259,22 @@ class VideoPagerAdapter(
         if (position != RecyclerView.NO_POSITION) {
             val videoName = names.getOrElse(position) { "unknown" }
             holder.player?.let { salveazaProgres(videoName, it, null) }
+            players.remove(position)
         }
         holder.playerView.player = null
         holder.player?.run { stop(); release() }
+        if (playerActiv === holder.player) playerActiv = null
         holder.player = null
+    }
+
+    /**
+     * Activează (pornește audiovideo) videoclipul de pe pagina [position] și
+     * oprește toate celelalte. Apelat când se schimbă pagina în ViewPager2.
+     */
+    fun setActivePage(position: Int) {
+        activePosition = position
+        val player = players[position]
+        if (player != null) playerActiv = player
     }
 
     override fun getItemCount(): Int = items.size
@@ -266,7 +318,8 @@ class VideoPagerAdapter(
                 player.pause()
             } else {
                 holder.loadingContainer.visibility = View.GONE
-                player.play()
+                // facem acest player activ (oprește celelalte) și îl pornim
+                if (player !== playerActiv) playerActiv = player else player.play()
             }
             val nume = names.getOrElse(holder.adapterPosition) { "unknown" }
             if (!player.isPlaying && player.duration > 0) {
