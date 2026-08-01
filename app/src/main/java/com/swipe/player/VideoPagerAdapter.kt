@@ -79,7 +79,7 @@ class VideoPagerAdapter(
                     salveazaProgresDacaTimpul(videoName, player)
                 }
             }
-            override fun onPositionDiscontinuity() {
+            override fun onPositionDiscontinuity(reason: Int) {
                 salveazaProgresDacaTimpul(videoName, player)
             }
             override fun onPlayerError(error: PlaybackException) {
