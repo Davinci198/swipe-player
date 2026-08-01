@@ -41,18 +41,18 @@
             android:backgroundTint="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Buton setari: sus, colt stanga -->
+    <!-- Buton setari: dreapta jos (evita zona de Back Swipe din stanga sus) -->
     <ImageButton
         android:id="@+id/btnSettings"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
-        android:layout_gravity="top|start"
-        android:layout_margin="14dp"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="20dp"
         android:contentDescription="Setări"
         android:background="@drawable/bg_settings"
         android:src="@android:drawable/ic_menu_manage"
         android:scaleType="centerInside"
         android:padding="12dp"
-        android:elevation="4dp"
-        android:alpha="0.9" />
+        android:elevation="8dp"
+        android:alpha="0.92" />
 </FrameLayout>

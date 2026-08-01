@@ -156,7 +156,11 @@ class MainActivity : AppCompatActivity() {
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
         // aplica rezoluția salvată (0=Auto, 720, 1080, 1440/2K, 2160/4K)
-        val (rw, rh) = rezolutieW(rezolutieCurenta)
+        var (rw, rh) = rezolutieW(rezolutieCurenta)
+        if (rw >= 3840 && !isDeviceSuports4K()) {
+            rw = 1920; rh = 1080; rezolutieCurenta = 1080
+            Toast.makeText(this, "Echipamentul nu suportă 4K → 1080p", Toast.LENGTH_SHORT).show()
+        }
         if (rw > 0) nouAdapter.setResolutie(rw, rh)
         adapter = nouAdapter
         viewPager.adapter = nouAdapter
@@ -169,7 +173,8 @@ class MainActivity : AppCompatActivity() {
         })
         nouAdapter.setActivePage(0) // doar primul videoclip pornește, restul rămân oprite
 
-        aplicaLumina(luminozitateCurenta)
+        // aplică luminozitatea doar dacă e într-un interval rezonabil (bug sistem: nu forțăm 10%)
+        if (luminozitateCurenta in 0.3f..1.0f) aplicaLumina(luminozitateCurenta)
         val st = MemoryManager.getInstance(this).getStatistici()
         tvStatus.text = "🎬 ${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"
         Toast.makeText(this, "S-au încărcat ${lista.size} videoclipuri", Toast.LENGTH_SHORT).show()
@@ -189,9 +194,20 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         salveazaSetarileCurente()
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Luminozitate: NU restaura automat o valoare prea mică (bug sistem).
+        // Reaplicăm doar dacă valoarea e într-un interval rezonabil (0.3..1.0).
+        if (luminozitateCurenta in 0.3f..1.0f) {
+            aplicaLumina(luminozitateCurenta)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         salveazaSetarileCurente()
+        // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
         try {
             val lp = window.attributes ?: return
             lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
@@ -204,6 +220,19 @@ class MainActivity : AppCompatActivity() {
             MemoryManager.getInstance(this).salveazaRezolutie(rezolutieCurenta)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
+        }
+    }
+
+    // Euristică de suport 4K: jumătate din dispozitivele cu >= 6GB RAM decodează 4K fără throttling
+    private fun isDeviceSuports4K(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val memInfo = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfo)
+            val ramTotalGB = memInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
+            ramTotalGB >= 6.0
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -291,9 +320,13 @@ class MainActivity : AppCompatActivity() {
                 volumCurent = vol
                 adapter?.setVolume(vol)
 
-                // Rezoluție
+                // Rezoluție (4K pe dispozitive slabe => fallback la 1080p + toast)
                 val checked = radio.checkedRadioButtonId
-                val (h, wh) = idRes[checked] ?: (0 to (7680 to 4320))
+                var (h, wh) = idRes[checked] ?: (0 to (7680 to 4320))
+                if (wh.first >= 3840 && !isDeviceSuports4K()) {
+                    h = 1080; wh = 1920 to 1080
+                    Toast.makeText(this, "Echipamentul nu suportă 4K → 1080p", Toast.LENGTH_SHORT).show()
+                }
                 rezolutieCurenta = h
                 adapter?.setResolutie(wh.first, wh.second)
 

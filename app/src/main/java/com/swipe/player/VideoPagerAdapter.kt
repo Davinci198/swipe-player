@@ -90,8 +90,6 @@ class VideoPagerAdapter(
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
-        val brightZone: View = view.findViewById(R.id.brightZone)
-        val volZone: View = view.findViewById(R.id.volZone)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -153,19 +151,33 @@ class VideoPagerAdapter(
             playerActiv = player
         }
 
-        // ===== Gesturi: drag orizontal = seek, dublu-tap = play/pause =====
-        // drag orizontal = seek / derulare video; dublu-tap = play/pause
-        val seekGesture = android.view.GestureDetector(
+        // ===== Gesture State Machine =====
+        // Un singur GestureDetector (taps) + un singur OnTouchListener (drag-uri).
+        // Stări dragMod: 0=none, 2=luminozitate(stânga), 1=volum(dreapta),
+        //                3=seek(orizontal), 4=scroll vertical (lăsat ViewPager2)
+        val gesture = android.view.GestureDetector(
             context,
             object : android.view.GestureDetector.SimpleOnGestureListener() {
-                override fun onDoubleTap(e: MotionEvent): Boolean {
-                    togglePlay(holder, player)
+                override fun onDown(e: MotionEvent): Boolean = true
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    // 1 tap = arată/ascunde controllerul (play/pause)
+                    if (holder.playerView.isControllerVisible) holder.playerView.hideController()
+                    else holder.playerView.showController()
                     return true
                 }
-                override fun onDown(e: MotionEvent): Boolean = true
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    togglePlay(holder, player) // 2 tap = play/pause
+                    return true
+                }
             }
         )
+
+        // pragul lateral: sub acest % din lățime = luminozitate, peste = volum
+        val limitaStanga = 0.42f
+        val limitaDreapta = 0.58f
+
         holder.playerView.setOnTouchListener { view, event ->
+            gesture.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     dragMod = 0
@@ -174,45 +186,65 @@ class VideoPagerAdapter(
                     dragStartY = event.y
                     dragStartVal = dragStartY
                     dragStartPosMs = player.currentPosition
-                    true // prindem stream-ul ca să observăm direcția gestului
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.x - dragStartX
-                    val dy = event.y - dragStartY
-                    // dacă gestul e VERTICAL => lăsăm scroll-ul vertical (schimbare videoclip)
-                    // să fie gestionat de ViewPager2; returnăm false ca RecyclerView-ul să preia.
-                    if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
-                        dragMod = 0
-                        seekActive = false
-                        return@setOnTouchListener false
-                    }
-                    // altfel => drag orizontal = seek / derulare video
-                    if (!seekActive && kotlin.math.abs(dx) < dragThreshold) {
-                        return@setOnTouchListener true
-                    }
-                    dragMod = 3
-                    seekActive = true
-                    val durata = player.duration.coerceAtLeast(0L)
-                    if (durata > 0) {
-                        // swife orizontal = derulare în pași de exact 10 sec (SEEK_STEP_MS)
-                        val pas = ((event.x - dragStartX) / 15f).toInt()
-                        val target = dragStartPosMs + pas * SEEK_STEP_MS
-                        player.seekTo(target.coerceIn(0L, durata))
+                    when (dragMod) {
+                        // încă nedecis: stabilim direcția gestului
+                        0 -> {
+                            val dx = event.x - dragStartX
+                            val dy = event.y - dragStartY
+                            val orizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+                            if (orizontal) {
+                                if (kotlin.math.abs(dx) < dragThreshold) return@setOnTouchListener true
+                                dragMod = 3 // seek
+                                view.parent?.requestDisallowInterceptTouchEvent(true)
+                            } else {
+                                if (kotlin.math.abs(dy) < dragThreshold) return@setOnTouchListener true
+                                val raportX = event.x / view.width.toFloat().coerceAtLeast(1f)
+                                view.parent?.requestDisallowInterceptTouchEvent(false)
+                                dragMod = when {
+                                    raportX < limitaStanga -> 2 // luminozitate
+                                    raportX > limitaDreapta -> 1 // volum
+                                    else -> 4 // scroll vertical => lasă ViewPager2
+                                }
+                            }
+                        }
+                        2 -> { // luminozitate
+                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                            val delta = (dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            currentBrightness = (dragStartVal + delta).coerceIn(0.2f, 1.7f)
+                            onBrightnessChange?.invoke(currentBrightness)
+                            return@setOnTouchListener true
+                        }
+                        1 -> { // volum
+                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                            val delta = (dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            currentVolume = (dragStartVal + delta).coerceIn(0f, 1f)
+                            playerActiv?.volume = currentVolume
+                            onVolumeChange?.invoke(currentVolume)
+                            return@setOnTouchListener true
+                        }
+                        3 -> { // seek orizontal, pași de 10s
+                            val durata = player.duration.coerceAtLeast(0L)
+                            if (durata > 0) {
+                                val pas = ((event.x - dragStartX) / 15f).toInt()
+                                val target = dragStartPosMs + pas * SEEK_STEP_MS
+                                player.seekTo(target.coerceIn(0L, durata))
+                            }
+                            return@setOnTouchListener true
+                        }
+                        4 -> return@setOnTouchListener false // scroll vertical
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    // dacă a fost doar un tap (fără drag), lasă player-ul (controller play/pause)
-                    // și GestureDetector-ul să proceseze (dublu-tap)
-                    if (dragMod == 0) {
-                        seekGesture.onTouchEvent(event)
-                        return@setOnTouchListener view.onTouchEvent(event)
-                    }
+                    val eraScroll = dragMod == 4
                     dragMod = 0
                     seekActive = false
-                    true
+                    if (eraScroll) false else true
                 }
-                else -> seekGesture.onTouchEvent(event)
+                else -> true
             }
         }
 
@@ -223,43 +255,6 @@ class VideoPagerAdapter(
             holder.btnFav.setImageResource(if (ac) android.R.drawable.star_on else android.R.drawable.star_off)
         }
 
-        // drag luminozitate (stanga)
-        holder.brightZone.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    view.parent?.requestDisallowInterceptTouchEvent(true) // preia gestul de la ViewPager2
-                    dragMod = 2; dragStartY = event.y; dragStartVal = currentBrightness; true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (dragMod != 2) return@setOnTouchListener true
-                    val delta = (dragStartY - event.y) / (holder.brightZone.height * 2.2f)
-                    currentBrightness = (dragStartVal + delta).coerceIn(0.2f, 1.7f)
-                    onBrightnessChange?.invoke(currentBrightness)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { dragMod = 0; true }
-                else -> true
-            }
-        }
-        // drag volum (dreapta)
-        holder.volZone.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    view.parent?.requestDisallowInterceptTouchEvent(true) // preia gestul de la ViewPager2
-                    dragMod = 1; dragStartY = event.y; dragStartVal = currentVolume; true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (dragMod != 1) return@setOnTouchListener true
-                    val delta = (dragStartY - event.y) / (holder.volZone.height * 2.2f)
-                    currentVolume = (dragStartVal + delta).coerceIn(0f, 1f)
-                    playerActiv?.volume = currentVolume
-                    onVolumeChange?.invoke(currentVolume)
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { dragMod = 0; true }
-                else -> true
-            }
-        }
     }
 
     override fun onViewRecycled(holder: VH) {
@@ -328,9 +323,11 @@ class VideoPagerAdapter(
     fun setResolutie(w: Int, h: Int) {
         currentResolutie = Pair(w, h)
         try {
-            trackSelector.setParameters(
-                trackSelector.buildUponParameters().setMaxVideoSize(w, h).build()
-            )
+            val params = trackSelector.buildUponParameters()
+                .setMaxVideoSize(w, h)
+                .setForceHighestSupportedBitrate(false) // nu forțăm cea mai mare rată de bit
+                .build()
+            trackSelector.setParameters(params)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare aplicare rezoluție", e)
         }

@@ -28,21 +28,6 @@
             android:textSize="14sp"
             android:layout_marginTop="16dp" />
     </LinearLayout>
-    <!-- Zona stanga: drag vertical = luminozitate -->
-    <View
-        android:id="@+id/brightZone"
-        android:layout_width="90dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:layout_weight="0"
-        android:layout_marginEnd="0dp"
-        android:background="@android:color/transparent" />
-    <View
-        android:id="@+id/volZone"
-        android:layout_width="90dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="end"
-        android:background="@android:color/transparent" />
     <TextView
         android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
