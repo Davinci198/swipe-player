@@ -108,6 +108,9 @@ class VideoPagerAdapter(
         var dragStartPosMs = 0L
         var seekActive = false
         val dragThreshold = 40f // prag activare gest (px)
+
+        // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
+        var controllerVisibil = false
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -179,8 +182,9 @@ class VideoPagerAdapter(
                 override fun onDown(e: MotionEvent): Boolean = true
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     // 1 tap = arată/ascunde controllerul (play/pause)
-                    if (holder.playerView.isControllerVisible) holder.playerView.hideController()
+                    if (holder.controllerVisibil) holder.playerView.hideController()
                     else holder.playerView.showController()
+                    holder.controllerVisibil = !holder.controllerVisibil
                     return true
                 }
                 override fun onDoubleTap(e: MotionEvent): Boolean {
