@@ -105,6 +105,7 @@ class VideoPagerAdapter(
         holder.player = player
         players[position] = player
         holder.playerView.player = player
+        holder.playerView.setShowControllerTimeoutMs(2000) // controllerul dispare mai repede
         // NU pornim automat - doar videoclipul activ porneste (prin setActivePage)
         player.volume = 0f
         onBrightnessChange?.invoke(currentBrightness)
