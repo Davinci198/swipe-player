@@ -10,7 +10,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -28,24 +30,37 @@ import androidx.viewpager2.widget.ViewPager2
 class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.Listener {
     private val TAG = "MainActivity"
     private val REQUEST_VIDEOS = 1001
+    private val REQUEST_PHOTOS = 1003
     private val REQUEST_PERMS = 1002
     private val PREFS = "swipe_uv"
     private val KEY_URIS = "uris_video"
+    private val KEY_PHOTO_URIS = "uris_photo"
 
     private lateinit var tvStatus: TextView
     private lateinit var viewPager: ViewPager2
+    private lateinit var imagePager: ViewPager2
+    private lateinit var modeVideoBtn: TextView
+    private lateinit var modePhotoBtn: TextView
     private lateinit var prefs: SharedPreferences
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
     private var rezolutieCurenta: Int = 0 // 0=Auto, 720, 1080, 1440 (2K), 2160 (4K)
     private var adapter: VideoPagerAdapter? = null
+    private var photoAdapter: ImagePagerAdapter? = null
     private var videouri: MutableList<Uri> = mutableListOf()
+    private var poze: MutableList<Uri> = mutableListOf()
+
+    // modul curent: "video" sau "photo"
+    private var modCurent: String = "video"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         tvStatus = findViewById(R.id.tvStatus)
         viewPager = findViewById(R.id.viewPager)
+        imagePager = findViewById(R.id.imagePager)
+        modeVideoBtn = findViewById(R.id.modeVideoBtn)
+        modePhotoBtn = findViewById(R.id.modePhotoBtn)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         // Buton setari (colț dreapta jos - evită back-swipe din stânga sus)
@@ -55,6 +70,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // Scroll VERTICAL (sus/jos) - ca TikTok
         viewPager.orientation = ViewPager2.ORIENTATION_VERTICAL
         viewPager.isUserInputEnabled = true
+        imagePager.orientation = ViewPager2.ORIENTATION_VERTICAL
+        imagePager.isUserInputEnabled = true
+
+        // mod videoclipuri / poze
+        modeVideoBtn.setOnClickListener { setMod("video") }
+        modePhotoBtn.setOnClickListener { setMod("photo") }
 
         // Încărcare setări salvate (volum, luminozitate)
         val setari = MemoryManager.getInstance(this).incarcaSetari()
@@ -64,14 +85,32 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
         rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
 
-        val btnAlege = findViewById<Button>(R.id.btnChoose)
-        btnAlege.setOnClickListener { alegeVideoclipuri() }
-
         cerePermisiuniDacaNecesar()
         cerePermisiuneLuminozitate() // Motorola/Android 12+: WRITE_SETTINGS pentru swipe lumina
 
-        // Restaurează lista salvată de videoclipuri (dacă există)
+        // Restaurează listele salvate (videoclipuri + poze)
         restaurareLista()
+        restaurarePoze()
+        setMod("video")
+    }
+
+    /** comută între modul de videoclipuri și galeria de poze (ambele cu swipe vertical) */
+    private fun setMod(mod: String) {
+        modCurent = mod
+        val video = mod == "video"
+        viewPager.visibility = if (video && adapter != null) View.VISIBLE else View.GONE
+        imagePager.visibility = if (!video && photoAdapter != null) View.VISIBLE else View.GONE
+        // evidențiază butonul activ
+        modeVideoBtn.setBackgroundColor(if (video) 0x33FFFFFF.toInt() else 0x00000000)
+        modePhotoBtn.setBackgroundColor(if (!video) 0x33FFFFFF.toInt() else 0x00000000)
+        val status = if (video) {
+            val n = adapter?.itemCount ?: videouri.size
+            if (n > 0) "🎬 $n videoclipuri" else "Niciun videoclip ales"
+        } else {
+            val n = photoAdapter?.itemCount ?: poze.size
+            if (n > 0) "🖼️ $n poze" else "Nicio poză aleasă"
+        }
+        tvStatus.text = status
     }
 
     /**
@@ -113,14 +152,20 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     private fun alegeVideoclipuri() {
+        deschidePicker("video/*", REQUEST_VIDEOS)
+    }
+    private fun alegePoze() {
+        deschidePicker("image/*", REQUEST_PHOTOS)
+    }
+    private fun deschidePicker(mime: String, requestCode: Int) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "video/*"
+            type = mime
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         try {
-            startActivityForResult(intent, REQUEST_VIDEOS)
+            startActivityForResult(intent, requestCode)
         } catch (e: Exception) {
             Toast.makeText(this, "Nu am găsit un picker de fișiere", Toast.LENGTH_LONG).show()
         }
@@ -129,33 +174,42 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_VIDEOS && resultCode == RESULT_OK && data != null) {
-            val uriSele = mutableListOf<Uri>()
-            if (data.clipData != null) {
-                for (i in 0 until data.clipData!!.itemCount) {
-                    data.clipData!!.getItemAt(i).uri?.let { uriSele.add(it) }
-                }
-            } else if (data.data != null) {
-                data.data?.let { uriSele.add(it) }
+        if (resultCode != RESULT_OK || data == null) return
+        if (requestCode != REQUEST_VIDEOS && requestCode != REQUEST_PHOTOS) return
+        val uriSele = mutableListOf<Uri>()
+        if (data.clipData != null) {
+            for (i in 0 until data.clipData!!.itemCount) {
+                data.clipData!!.getItemAt(i).uri?.let { uriSele.add(it) }
             }
-            if (uriSele.isNotEmpty()) {
-                uriSele.forEach { uri ->
-                    try {
-                        contentResolver.takePersistableUriPermission(
-                            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    } catch (e: Exception) { Log.w(TAG, "nu pot persista accesul: $e") }
-                }
-                videouri.clear()
-                videouri.addAll(uriSele)
-                salveazaLista()
-                incarcaLista(videouri)
-            }
+        } else if (data.data != null) {
+            data.data?.let { uriSele.add(it) }
+        }
+        if (uriSele.isEmpty()) return
+        uriSele.forEach { uri ->
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) { Log.w(TAG, "nu pot persista accesul: $e") }
+        }
+        if (requestCode == REQUEST_VIDEOS) {
+            videouri.clear(); videouri.addAll(uriSele)
+            salveazaLista()
+            incarcaLista(videouri)
+        } else {
+            poze.clear(); poze.addAll(uriSele)
+            salveazaPoze()
+            incarcaPoze(poze)
         }
     }
 
     private fun salveazaLista() {
         val joined = videouri.joinToString("\n") { it.toString() }
         prefs.edit().putString(KEY_URIS, joined).apply()
+    }
+
+    private fun salveazaPoze() {
+        val joined = poze.joinToString("\n") { it.toString() }
+        prefs.edit().putString(KEY_PHOTO_URIS, joined).apply()
     }
 
     private fun restaurareLista() {
@@ -167,6 +221,31 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             runCatching { Uri.parse(s) }.getOrNull()?.let { videouri.add(it) }
         }
         if (videouri.isNotEmpty()) incarcaLista(videouri)
+    }
+
+    private fun restaurarePoze() {
+        val raw = prefs.getString(KEY_PHOTO_URIS, null) ?: return
+        val uriStrings = raw.split("\n").filter { it.isNotBlank() }
+        if (uriStrings.isEmpty()) return
+        poze.clear()
+        uriStrings.forEach { s ->
+            runCatching { Uri.parse(s) }.getOrNull()?.let { poze.add(it) }
+        }
+        if (poze.isNotEmpty()) incarcaPoze(poze)
+    }
+
+    /** încarcă galeria de poze (swipe vertical separat de videoclipuri) */
+    private fun incarcaPoze(lista: List<Uri>) {
+        if (lista.isEmpty()) {
+            Toast.makeText(this, "Nu s-a selectat nicio poză", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val nouAdapter = ImagePagerAdapter(this, lista)
+        photoAdapter = nouAdapter
+        imagePager.adapter = nouAdapter
+        imagePager.setCurrentItem(0, false)
+        setMod("photo")
+        tvStatus.text = "🖼️ ${lista.size} poze"
     }
 
     private fun incarcaLista(lista: List<Uri>) {
@@ -204,6 +283,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val st = MemoryManager.getInstance(this).getStatistici()
         tvStatus.text = "🎬 ${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"
         Toast.makeText(this, "S-au încărcat ${lista.size} videoclipuri", Toast.LENGTH_SHORT).show()
+        setMod("video") // afișează pagerul de videoclipuri
     }
 
     private fun aplicaLumina(valoare: Float) {
@@ -302,6 +382,13 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // șterge doar istoricul de vizionare, NU fișierele locale
         MemoryManager.getInstance(this).stergeTotIstoricul()
         Toast.makeText(this, "Istoric vizionare șters", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onChooseVideos() {
+        alegeVideoclipuri()
+    }
+    override fun onChoosePhotos() {
+        alegePoze()
     }
 
     override fun onReset() {

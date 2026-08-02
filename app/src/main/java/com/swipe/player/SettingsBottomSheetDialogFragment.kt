@@ -35,6 +35,10 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         fun onClearHistory()
         /** reset la valori implicite */
         fun onReset()
+        /** alege videoclipuri din telefon (din setări) */
+        fun onChooseVideos()
+        /** alege poze din telefon (din setări) */
+        fun onChoosePhotos()
     }
 
     private var listener: Listener? = null
@@ -66,6 +70,23 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             text = "⚙️ Setări"
             textSize = 20f
             setTextColor(Color.WHITE)
+        })
+
+        // ---- Alegere fișiere (videoclipuri / poze) ----
+        root.addView(label("Bibliotecă"))
+        root.addView(Button(requireContext()).apply {
+            text = "+ ALEGE VIDEOCLIPURI"
+            setOnClickListener {
+                listener?.onChooseVideos()
+                dismiss()
+            }
+        })
+        root.addView(Button(requireContext()).apply {
+            text = "+ ALEGE POZE (galerie)"
+            setOnClickListener {
+                listener?.onChoosePhotos()
+                dismiss()
+            }
         })
 
         // ---- Luminozitate (aplicată live, native de sistem) ----

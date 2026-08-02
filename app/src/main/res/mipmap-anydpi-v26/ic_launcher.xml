@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Pictograma completa 1600x1600 pe fundal (full-bleed) => nu se taie continutul.
-         Foreground transparent; masca lansatorului (cerc/squircle) se aplica doar pe fundal. -->
-    <background android:drawable="@mipmap/ic_launcher"/>
-    <foreground android:drawable="@android:color/transparent"/>
+    <!-- Fundal solid (culoarea temei), icoana imagine pe foreground. Astfel glif-ul
+         alb al pictogramei ramane VIZIBIL pe tile-ul inchis, indiferent de masca lansatorului. -->
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher"/>
 </adaptive-icon>
