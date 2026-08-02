@@ -4,18 +4,19 @@
     android:layout_height="match_parent"
     android:background="#FF050507">
 
-    <!-- Pager VIDEOCLIPURI (swipe vertical) -->
+    <!-- Pager VIDEOCLIPURI (swipe vertical). Folosește marginile stânga/dreapta pentru luminozitate/volum. -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- Pager POZE (swipe vertical, separat de video) -->
+    <!-- Pager POZE (swipe vertical). Sus cu o margine jos ca să NU se suprapună peste bara de control foto. -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/imagePager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="76dp"
         android:visibility="gone" />
 
     <!-- Header: compact, cu comutator mod (Video / Poze) + status.
@@ -69,7 +70,49 @@
             android:layout_marginTop="6dp" />
     </LinearLayout>
 
-    <!-- Buton setari: colț stânga sus, sub header -->
+    <!-- Bara de control FOTO (jos): luminozitate (stânga) + volum (dreapta).
+         Vizibilă DOAR în modul Poze; nu se suprapune peste poze (pagerul are margine jos). -->
+    <LinearLayout
+        android:id="@+id/photoControlsBar"
+        android:layout_width="match_parent"
+        android:layout_height="76dp"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#EE111116"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="☀️"
+            android:textSize="18sp" />
+
+        <SeekBar
+            android:id="@+id/photoBrightnessSeek"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="1000" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:text="🔊"
+            android:textSize="18sp" />
+
+        <SeekBar
+            android:id="@+id/photoVolumeSeek"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="1000" />
+    </LinearLayout>
+
+    <!-- Buton setari: colț dreapta sus, sub header -->
     <ImageButton
         android:id="@+id/btnSettings"
         android:layout_width="56dp"

@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:background="#FF050507">
 
-    <!-- Poză full-screen, scaleType centerCrop ca să umple ecranul fără a distorsiona -->
-    <ImageView
+    <!-- Poză full-screen, cu ZOOM in/out (pinch) + pan; centerCrop la încărcare -->
+    <com.swipe.player.ZoomableImageView
         android:id="@+id/imgPhoto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -19,4 +19,17 @@
         android:layout_height="48dp"
         android:indeterminate="true"
         android:layout_gravity="center" />
+
+    <!-- Creionul pentru REDENUMIRE poză (colț dreapta sus) -->
+    <ImageButton
+        android:id="@+id/imgRenameBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_pencil"
+        android:scaleType="centerInside"
+        android:padding="10dp"
+        android:contentDescription="Redenumește poza" />
 </FrameLayout>

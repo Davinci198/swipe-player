@@ -21,10 +21,12 @@ import java.util.concurrent.Executors
  *  - downsampling la dimensiunea ecranului + RGB_565 (jumătate de memorie),
  *  - decodare SERIALIZATĂ (un singur thread worker) => fără vârfuri de heap,
  *  - reciclarea bitmap-urilor înlocuite / reciclate de RecyclerView.
+ * Include ZOOM (ZoomableImageView) + buton REDENUMIRE (creion), delegat la callback.
  */
 class ImagePagerAdapter(
     private val context: Context,
-    private val items: List<Uri>
+    private val items: List<Uri>,
+    private val onRename: (position: Int) -> Unit = { _ -> }
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerAdapter.ImgVH>() {
 
     private val loaderQueue = Executors.newSingleThreadExecutor()
@@ -40,6 +42,7 @@ class ImagePagerAdapter(
     class ImgVH(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
         val image: ImageView = view.findViewById(R.id.imgPhoto)
         val loading: ProgressBar = view.findViewById(R.id.imgLoading)
+        val renameBtn: View = view.findViewById(R.id.imgRenameBtn)
         var pendingUri: String? = null
     }
 
@@ -57,6 +60,10 @@ class ImagePagerAdapter(
         recyclaBitmapActual(holder, key)
         holder.image.setImageDrawable(null)
         holder.loading.visibility = View.VISIBLE
+
+        holder.renameBtn.setOnClickListener {
+            onRename(holder.bindingAdapterPosition)
+        }
 
         cache.get(key)?.let { bmp ->
             if (holder.pendingUri == key && !bmp.isRecycled) {
@@ -85,7 +92,6 @@ class ImagePagerAdapter(
         holder.image.setImageDrawable(null)
     }
 
-    /** reciclează bitmap-ul curent dacă NU e referit de cache */
     private fun recyclaBitmapActual(holder: ImgVH, keyNou: String) {
         val d = holder.image.drawable
         if (d is BitmapDrawable) {
@@ -111,7 +117,6 @@ class ImagePagerAdapter(
         return false
     }
 
-    /** decodează bitmap-ul downsampliat la dimensiunea ecranului (RAM mic) */
     private fun decodeSampled(uri: Uri): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         try {

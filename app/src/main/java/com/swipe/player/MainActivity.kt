@@ -41,6 +41,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private lateinit var imagePager: ViewPager2
     private lateinit var modeVideoBtn: TextView
     private lateinit var modePhotoBtn: TextView
+    private lateinit var photoControlsBar: View
+    private lateinit var photoBrightnessSeek: android.widget.SeekBar
+    private lateinit var photoVolumeSeek: android.widget.SeekBar
     private lateinit var prefs: SharedPreferences
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
@@ -61,7 +64,28 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         imagePager = findViewById(R.id.imagePager)
         modeVideoBtn = findViewById(R.id.modeVideoBtn)
         modePhotoBtn = findViewById(R.id.modePhotoBtn)
+        photoControlsBar = findViewById(R.id.photoControlsBar)
+        photoBrightnessSeek = findViewById(R.id.photoBrightnessSeek)
+        photoVolumeSeek = findViewById(R.id.photoVolumeSeek)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        // bara de control foto (jos, doar în modul Poze): luminozitate + volum
+        photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
+        photoBrightnessSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) onBrightnessChange(progress / 1000f)
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+        })
+        photoVolumeSeek.progress = (volumCurent * 1000).toInt()
+        photoVolumeSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) onVolumeChange(progress / 1000f)
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+        })
 
         // Buton setari (colț dreapta jos - evită back-swipe din stânga sus)
         val btnSettings = findViewById<android.widget.ImageButton>(R.id.btnSettings)
@@ -84,6 +108,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             luminozitateCurenta = setari.second
         }
         rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
+        // sincronizează barele foto (luminozitate/volum) cu valorile salvate
+        photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
+        photoVolumeSeek.progress = (volumCurent * 1000).toInt()
 
         cerePermisiuniDacaNecesar()
         cerePermisiuneLuminozitate() // Motorola/Android 12+: WRITE_SETTINGS pentru swipe lumina
@@ -100,6 +127,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val video = mod == "video"
         viewPager.visibility = if (video && adapter != null) View.VISIBLE else View.GONE
         imagePager.visibility = if (!video && photoAdapter != null) View.VISIBLE else View.GONE
+        // bara de control foto (luminozitate/volum) — DOAR în modul Poze
+        photoControlsBar.visibility = if (!video) View.VISIBLE else View.GONE
         // evidențiază butonul activ
         modeVideoBtn.setBackgroundColor(if (video) 0x33FFFFFF.toInt() else 0x00000000)
         modePhotoBtn.setBackgroundColor(if (!video) 0x33FFFFFF.toInt() else 0x00000000)
@@ -240,12 +269,90 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Toast.makeText(this, "Nu s-a selectat nicio poză", Toast.LENGTH_SHORT).show()
             return
         }
-        val nouAdapter = ImagePagerAdapter(this, lista)
+        val nouAdapter = ImagePagerAdapter(this, lista, onRename = { pos -> deschideRedenumire(pos) })
         photoAdapter = nouAdapter
         imagePager.adapter = nouAdapter
         imagePager.setCurrentItem(0, false)
         setMod("photo")
         tvStatus.text = "🖼️ ${lista.size} poze"
+    }
+
+    /** creionul din galeria de poze: dialog pentru REDENUMIREA pozei */
+    private fun deschideRedenumire(position: Int) {
+        if (position < 0 || position >= poze.size) return
+        val uri = poze[position]
+        val numeCurent = numePoza(uri) ?: ""
+        val input = android.widget.EditText(this).apply {
+            setText(numeCurent)
+            selectAll()
+            setSingleLine(true)
+            hint = "Noul nume (fără extensie .jpg)"
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Redenumește poza")
+            .setView(input)
+            .setPositiveButton("Salvează") { _, _ ->
+                val noulNume = input.text.toString().trim()
+                if (noulNume.isEmpty()) return@setPositiveButton
+                val reusit = redenumestePoza(uri, noulNume)
+                if (reusit != null) {
+                    // actualizează lista + persistă + reîncarcă galeria
+                    poze[position] = reusit
+                    salveazaPoze()
+                    incarcaPoze(poze)
+                    Toast.makeText(this, "Poza redenumită ✔", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Nu am putut redenumi. Poate este .jpg .png .gif .bmp .webp", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Anulează", null)
+            .show()
+    }
+
+    private fun numePoza(uri: Uri): String? {
+        return try {
+            val display = android.provider.DocumentsContract.getDocumentId(uri)
+                ?.substringAfterLast('/')
+            if (display.isNullOrBlank()) {
+                queryDisplayName(uri)
+            } else display
+        } catch (e: Exception) { queryDisplayName(uri) }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return try {
+            val c = contentResolver.query(uri, arrayOf(
+                android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            c?.use {
+                if (it.moveToFirst()) {
+                    val name = it.getString(it.getColumnIndexOrThrow(
+                        android.provider.OpenableColumns.DISPLAY_NAME))
+                    name?.substringBeforeLast('.')
+                } else null
+            }
+        } catch (e: Exception) { null }
+    }
+
+    /** rename prin SAF; reîntoarce noul Uri sau null dacă eșuează */
+    private fun redenumestePoza(uri: Uri, numeNou: String): Uri? {
+        return try {
+            val newUri = android.provider.DocumentsContract.renameDocument(
+                contentResolver, uri, nomFisier(numeNou))
+            if (newUri != null) {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: Exception) { }
+                newUri
+            } else uri
+        } catch (e: Exception) {
+            Log.w(TAG, "renameDocument a eșuat", e)
+            null
+        }
+    }
+
+    private fun nomFisier(nume: String): String {
+        return if (nume.contains('.')) nume else "$nume.jpg"
     }
 
     private fun incarcaLista(lista: List<Uri>) {
@@ -362,12 +469,25 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         luminozitateCurenta = brightness.coerceIn(0.15f, 1f)
         aplicaLumina(luminozitateCurenta)      // native de sistem (pe fereastră)
         adapter?.setBrightness(luminozitateCurenta)
+        if (::photoBrightnessSeek.isInitialized) {
+            photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
+        }
         salveazaSetarileCurente()
     }
 
     override fun onVolumeChange(volume: Float) {
         volumCurent = volume.coerceIn(0f, 1f)
-        adapter?.setVolume(volumCurent)        // aplicat direct pe playerul activ
+        adapter?.setVolume(volumCurent)        // aplicat direct pe playerul activ (video)
+        // și volumul media de sistem, ca să funcționeze și în modul Poze (fără player video)
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+            val target = (volumCurent * max).toInt().coerceIn(0, max)
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0)
+        } catch (e: Exception) {
+            Log.w(TAG, "Nu pot seta volumul media", e)
+        }
+        photoVolumeSeek.progress = (volumCurent * 1000).toInt()
         salveazaSetarileCurente()
     }
 
