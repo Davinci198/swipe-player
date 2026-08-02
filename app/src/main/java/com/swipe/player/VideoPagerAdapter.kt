@@ -177,12 +177,13 @@ class VideoPagerAdapter(
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
         var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
+        var dragZona = 0 // 0=mijloc(scroll), 1=margine stânga(lumină), 2=margine dreapta(volum)
         var dragStartX = 0f
         var dragStartY = 0f
         var dragStartVal = 0f
         var dragStartPosMs = 0L
         var seekActive = false
-        val dragThreshold = 15f // prag activare gest (px) - sub 15px nu interceptăm
+        val dragThreshold = 15f // prag activare gest orizontal (px) pentru seek
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
@@ -259,7 +260,14 @@ class VideoPagerAdapter(
 
         val h = holder // referință locală pentru readabilitate
         h.playerView.setOnTouchListener { view, event ->
-            gesture.onTouchEvent(event)
+            // GestureDetector pentru tap/dublu-tap (play/pause/controller)
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                gesture.onTouchEvent(event)
+            } else if (event.actionMasked != MotionEvent.ACTION_MOVE ||
+                !(h.dragMod in 1..3)) { // nu consumă MOVE-urile când facem lumina/volum/seek
+                gesture.onTouchEvent(event)
+            }
+
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     h.dragMod = 0
@@ -268,44 +276,60 @@ class VideoPagerAdapter(
                     h.dragStartY = event.y
                     h.dragStartVal = event.y
                     h.dragStartPosMs = player.currentPosition
+                    // decizie la DOWN, pe baza zonei unde începe atingerea:
+                    val w = view.width.toFloat().coerceAtLeast(1f)
+                    h.dragZona = when {
+                        event.x < marginePx -> 1 // margine stânga => lumină
+                        event.x > w - marginePx -> 2 // margine dreapta => volum
+                        else -> 0 // mijloc => scroll vertical (ViewPager2)
+                    }
+                    if (h.dragZona != 0) {
+                        // blochez scroll-ul ViewPager imediat => lumina/volumul pornesc garantat
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     when (h.dragMod) {
-                        // încă nedecis: stabilim direcția gestului
+                        // încă nedecis: stabilim direcția gestului (după prag mic)
                         0 -> {
                             val dx = event.x - h.dragStartX
                             val dy = event.y - h.dragStartY
                             val orizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
-                            if (orizontal) {
-                                if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
-                                h.dragMod = 3 // seek
-                                view.parent?.requestDisallowInterceptTouchEvent(true)
-                            } else {
-                                val w = view.width.toFloat().coerceAtLeast(1f)
-                                val peStanga = event.x < marginePx
-                                val peDreapta = event.x > w - marginePx
-                                if (!peStanga && !peDreapta) {
-                                    // mijloc => imediat scroll vertical, lasă ViewPager2 (fără disallow)
+                            if (h.dragZona == 0) {
+                                // mijloc: orizontal -> seek, vertical -> scroll ViewPager
+                                if (orizontal) {
+                                    if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
+                                    h.dragMod = 3 // seek
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
+                                } else {
+                                    // lasă ViewPager2 să facă scroll-ul vertical (nu cerem disallow)
                                     h.dragMod = 4
                                     return@setOnTouchListener false
                                 }
-                                // pe margine => lumina/volum. Cerem disallow DEVREME (la ~8px =
-                                // touchSlop-ul ViewPager) ca să câștigăm cursa cu scroll-ul vertical.
-                                if (kotlin.math.abs(dy) < 8f) return@setOnTouchListener true
-                                view.parent?.requestDisallowInterceptTouchEvent(true)
-                                h.dragMod = if (peStanga) 2 else 1
+                            } else {
+                                // margine: vertical -> lumina/volum, orizontal -> seek
+                                if (orizontal) {
+                                    if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
+                                    h.dragMod = 3
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
+                                } else {
+                                    if (kotlin.math.abs(dy) < 4f) return@setOnTouchListener true
+                                    h.dragMod = h.dragZona // 1=volum, 2=luminozitate
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
+                                }
                             }
                         }
-                        2 -> { // luminozitate
-                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                        2 -> { // luminozitate (margine stânga)
                             val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
                             currentBrightness = (h.dragStartVal + delta).coerceIn(0.15f, 1f)
                             onBrightnessChange?.invoke(currentBrightness)
                             return@setOnTouchListener true
                         }
-                        1 -> { // volum
-                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                        1 -> { // volum (margine dreapta)
                             val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
                             currentVolume = (h.dragStartVal + delta).coerceIn(0f, 1f)
                             playerActiv?.volume = currentVolume
@@ -321,14 +345,16 @@ class VideoPagerAdapter(
                             }
                             return@setOnTouchListener true
                         }
-                        4 -> return@setOnTouchListener false // scroll vertical
+                        4 -> return@setOnTouchListener false // scroll vertical (mijloc)
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     val eraScroll = h.dragMod == 4
                     h.dragMod = 0
+                    h.dragZona = 0
                     h.seekActive = false
+                    view.parent?.requestDisallowInterceptTouchEvent(false)
                     if (eraScroll) false else true
                 }
                 else -> true
