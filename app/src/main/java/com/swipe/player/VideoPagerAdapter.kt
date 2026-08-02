@@ -170,6 +170,7 @@ class VideoPagerAdapter(
 
     inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
+        val touchCatcher: View = view.findViewById(R.id.touch_catcher)
         var player: ExoPlayer? = null
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
@@ -259,7 +260,9 @@ class VideoPagerAdapter(
         val marginePx = 45f * context.resources.displayMetrics.density
 
         val h = holder // referință locală pentru readabilitate
-        h.playerView.setOnTouchListener { view, event ->
+        // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
+        // ca PlayerView/controllerul sa nu concureze pentru gesturi.
+        h.touchCatcher.setOnTouchListener { view, event ->
             // GestureDetector pentru tap/dublu-tap (play/pause/controller)
             if (event.actionMasked == MotionEvent.ACTION_UP) {
                 gesture.onTouchEvent(event)
