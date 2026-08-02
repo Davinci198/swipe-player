@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
@@ -67,9 +68,38 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         btnAlege.setOnClickListener { alegeVideoclipuri() }
 
         cerePermisiuniDacaNecesar()
+        cerePermisiuneLuminozitate() // Motorola/Android 12+: WRITE_SETTINGS pentru swipe lumina
 
         // Restaurează lista salvată de videoclipuri (dacă există)
         restaurareLista()
+    }
+
+    /**
+     * Luminozitatea ecranului (window.attributes.screenBrightness) e ignorată pe
+     * Android 12+ / Motorola dacă app nu are WRITE_SETTINGS. Aici cerem accesul.
+     */
+    private fun cerePermisiuneLuminozitate() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                !Settings.System.canWrite(this)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+                Toast.makeText(
+                    this,
+                    "Permiteți modificarea luminozității pentru controlul swipe",
+                    Toast.LENGTH_LONG
+                ).show()
+                try {
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Nu pot deschide setările WRITE_SETTINGS", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Eroare verificare WRITE_SETTINGS", e)
+        }
     }
 
     private fun cerePermisiuniDacaNecesar() {
@@ -177,6 +207,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     private fun aplicaLumina(valoare: Float) {
+        Log.d("BRIGHT", "aplicaLumina value=${"%.2f".format(valoare)}")
         try {
             val lp = window.attributes ?: return
             lp.screenBrightness = valoare.coerceIn(0f, 1f)

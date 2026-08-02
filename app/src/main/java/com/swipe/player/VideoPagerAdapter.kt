@@ -1,7 +1,9 @@
 package com.swipe.player
 
 import android.content.Context
+import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -171,6 +173,7 @@ class VideoPagerAdapter(
     inner class VH(view: View) : ViewHolder(view) {
         val playerView: PlayerView = view.findViewById(R.id.player_view)
         val touchCatcher: View = view.findViewById(R.id.touch_catcher)
+        val dimOverlay: View = view.findViewById(R.id.dimOverlay)
         var player: ExoPlayer? = null
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
@@ -205,6 +208,8 @@ class VideoPagerAdapter(
         live[position] = player
         holder.playerView.player = player
         holder.playerView.setControllerShowTimeoutMs(2000) // controllerul dispare mai repede
+        // aplică starea de luminozitate pe paginile nou afișate (fallback dim vizibil)
+        aplicaDim(holder, currentBrightness)
         // NU pornim automat - doar videoclipul activ porneste (prin setActivePage)
         player.volume = 0f
         onBrightnessChange?.invoke(currentBrightness)
@@ -276,12 +281,17 @@ class VideoPagerAdapter(
                     val w = view.width.toFloat().coerceAtLeast(1f)
                     // zone late: stânga 1/3 = luminozitate, dreapta 1/3 = volum,
                     // mijloc 1/3 = scroll vertical (schimbă videoclipul) / seek orizontal
-                    val marginePx = w * 0.33f
+                    // inset de siguranță de 4% din fiecare extremă => evită gesturile de
+                    // navigare de sistem (Motorola edge swipe) care pot fura evenimentul
+                    val inset = w * 0.04f
+                    val zStanga = w * 0.33f
+                    val zDreapta = w * 0.67f
                     h.dragZona = when {
-                        event.x < marginePx -> 1 // stânga => lumină
-                        event.x > w - marginePx -> 2 // dreapta => volum
-                        else -> 0 // mijloc => scroll/seek
+                        event.x in inset..zStanga -> 1 // stânga => lumină
+                        event.x in zDreapta..(w - inset) -> 2 // dreapta => volum
+                        else -> 0 // mijloc => scroll/seek (sau extremă, lăsat systemului)
                     }
+                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} zona=${h.dragZona} ${if (h.dragZona==1) "BRIGHT zone" else if (h.dragZona==2) "VOL zone" else "MID/SCROLL"}")
                     // valoarea de pornire = valoarea curenta (nu un pixel!)
                     h.dragStartVal = when (h.dragZona) {
                         1 -> currentBrightness // stanga = lumina
@@ -331,15 +341,20 @@ class VideoPagerAdapter(
                             }
                         }
                         2 -> { // luminozitate (margine stânga)
-                            val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            val dy = h.dragStartY - event.y
+                            Log.d("GESTURE", "BRIGHT MOVE dy=${"%.0f".format(dy)} dragMod=2")
+                            val delta = dy / (view.height.toFloat() * 1.6f)
                             currentBrightness = (h.dragStartVal + delta).coerceIn(0.15f, 1f)
                             onBrightnessChange?.invoke(currentBrightness)
+                            // fallback vizibil când window.screenBrightness e blocat (Motorola)
+                            aplicaDim(h, currentBrightness)
                             return@setOnTouchListener true
                         }
                         1 -> { // volum (margine dreapta)
                             val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
                             currentVolume = (h.dragStartVal + delta).coerceIn(0f, 1f)
-                            playerActiv?.volume = currentVolume
+                            // setează volumul sistemului (STREAM_MUSIC) + câștig player
+                            aplicaVolumSistem(currentVolume)
                             onVolumeChange?.invoke(currentVolume)
                             return@setOnTouchListener true
                         }
@@ -379,6 +394,11 @@ class VideoPagerAdapter(
 
     override fun onViewRecycled(holder: VH) {
         super.onViewRecycled(holder)
+        // reset fallback dim ca să nu rămână pe altă pagină
+        holder.dimOverlay?.let { ov ->
+            ov.alpha = 0f
+            ov.visibility = View.INVISIBLE
+        }
         val position = holder.adapterPosition
         if (position != RecyclerView.NO_POSITION) {
             val videoName = names.getOrElse(position) { "unknown" }
@@ -427,9 +447,54 @@ class VideoPagerAdapter(
         }
     }
 
+    // ===== volum sistem + câștig player (Motorola/Stock) =====
+    // Pe Android 12+/Motorola, player.volume (ExoPlayer) doar scade câștigul intern al
+    // playerului, NU volumul sistemului. Atunci când userul face swipe pe dreapta se așteaptă
+    // să se schimbe volumul media al telefonului => folosim AudioManager.
+    private fun audioManager(): AudioManager? =
+        try { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager } catch (e: Exception) { null }
+
+    fun aplicaVolumSistem(v: Float) {
+        try {
+            val am = audioManager() ?: return
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val newVol = (v.coerceIn(0f, 1f) * max).toInt()
+            // FLAG_SHOW_UI => apare sliderul de volum al sistemului (fara click sonor
+            // FLAG_PLAY_SOUND, ca sa nu tacaia continuu in timpul swipe-ului).
+            am.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, AudioManager.FLAG_SHOW_UI)
+            Log.d("VOLUME", "setStreamMusic=$newVol/$max ratio=${"%.2f".format(v)}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare setare volum sistem", e)
+        }
+        // setăm și câștigul intern al playerului activ pentru acuratețe
+        playerActiv?.volume = v.coerceIn(0f, 1f)
+    }
+
+    // ===== attenuire (dim) vizual ca fallback luminozitate =====
+    // Pe unele dispozitive (Motorola 12+) fără WRITE_SETTINGS, window.screenBrightness
+    // poate fi ignorat/limitat. Acest overlay negru peste player simulează scăderea
+    // luminozității ca să fie VIZIBIL. Dacă app ARE WRITE_SETTINGS, lumina e aplicată
+    // nativ pe fereastră => nu mai ateniem (evităm dubla întunecare).
+    fun aplicaDim(holder: VH?, b: Float) {
+        holder?.dimOverlay?.let { ov ->
+            val amScrisSetari = canWriteBrightness()
+            val alfa = if (amScrisSetari) {
+                0f // lumina e gestionată nativ pe fereastră
+            } else {
+                ((1f - b.coerceIn(0.15f, 1f)) * 0.8f).coerceIn(0f, 0.8f)
+            }
+            ov.alpha = alfa
+            ov.visibility = if (alfa > 0.02f) View.VISIBLE else View.INVISIBLE
+        }
+    }
+
+    private fun canWriteBrightness(): Boolean = try {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || android.provider.Settings.System.canWrite(context)
+    } catch (e: Exception) { false }
+
     fun setVolume(v: Float) {
         currentVolume = v
-        playerActiv?.volume = currentVolume
+        aplicaVolumSistem(currentVolume)
         onVolumeChange?.invoke(currentVolume)
     }
     fun setBrightness(b: Float) {

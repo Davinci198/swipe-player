@@ -3,19 +3,42 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF050507">
+    android:background="#FF050507"
+    android:fitsSystemWindows="false"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- 1. PlayerView (video) -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:use_controller="true"
         app:resize_mode="fit" />
+
+    <!-- 1b. Overlay de attenuire (dim) pt luminozitate: fallback vizibil cand
+         window.screenBrightness e blocat pe Motorola fara WRITE_SETTINGS.
+         Alpha controlat din cod; DEDESUBT touch_catcher. -->
+    <View
+        android:id="@+id/dimOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="invisible" />
+
+    <!-- 2. Loading - DEASUPRA video, DEDESUBT touch_catcher.
+         clickable=false ca sa nu-si insuseasca touch; elevatie mica. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:id="@+id/loadingContainer">
+        android:id="@+id/loadingContainer"
+        android:clickable="false"
+        android:focusable="false"
+        android:elevation="1dp">
         <ProgressBar
             android:layout_width="48dp"
             android:layout_height="48dp"
@@ -28,18 +51,28 @@
             android:textSize="14sp"
             android:layout_marginTop="16dp" />
     </LinearLayout>
-    <!-- Perdea de gesturi DEASUPRA video si loading: prinde swipe-urile
-         (lumina/volum/seek/scroll). Ramane sub nume si butonul de favorite. -->
+
+    <!-- 3. Perdea/touch_catcher: ULTIMUL strat full-screen, DEASUPRA video si loading.
+         clickable + focusable + elevation => asigura primirea touch pe Stock/Motorola.
+         Ramane DEDESUBT nume si buton fav (declarate mai jos). -->
     <View
         android:id="@+id/touch_catcher"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="10dp" />
+
+    <!-- Nume videoclip + buton fav: declarate DUPĂ touch_catcher => deasupra lui
+         (FrameLayout desenează ultimul copil în față), elevation 11dp pt siguranță. -->
     <TextView
         android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_margin="24dp"
+        android:elevation="11dp"
         android:textColor="#FFFFFF"
         android:textSize="16sp"
         android:shadowColor="#000000"
@@ -50,6 +83,7 @@
         android:layout_height="48dp"
         android:layout_gravity="top|end"
         android:layout_margin="20dp"
+        android:elevation="11dp"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@android:drawable/btn_star_big_off" />
