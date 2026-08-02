@@ -9,9 +9,11 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import androidx.recyclerview.widget.RecyclerView
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
@@ -178,6 +180,13 @@ class VideoPagerAdapter(
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
+        val brightnessIndicator: FrameLayout = view.findViewById(R.id.brightnessIndicator)
+        val brightnessFill: View = view.findViewById(R.id.brightnessFill)
+        val volumeIndicator: FrameLayout = view.findViewById(R.id.volumeIndicator)
+        val volumeFill: View = view.findViewById(R.id.volumeFill)
+        val seekIndicator: LinearLayout = view.findViewById(R.id.seekIndicator)
+        val seekTime: TextView = view.findViewById(R.id.seekTime)
+        val seekProgress: android.widget.ProgressBar = view.findViewById(R.id.seekProgress)
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
         var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
@@ -348,6 +357,8 @@ class VideoPagerAdapter(
                             onBrightnessChange?.invoke(currentBrightness)
                             // fallback vizibil când window.screenBrightness e blocat (Motorola)
                             aplicaDim(h, currentBrightness)
+                            // indicator vizual (bară stânga)
+                            showVerticalIndicator(h, 2, currentBrightness)
                             return@setOnTouchListener true
                         }
                         1 -> { // volum (margine dreapta)
@@ -356,6 +367,8 @@ class VideoPagerAdapter(
                             // setează volumul sistemului (STREAM_MUSIC) + câștig player
                             aplicaVolumSistem(currentVolume)
                             onVolumeChange?.invoke(currentVolume)
+                            // indicator vizual (bară dreapta)
+                            showVerticalIndicator(h, 1, currentVolume)
                             return@setOnTouchListener true
                         }
                         3 -> { // seek orizontal, pași de 10s
@@ -364,6 +377,8 @@ class VideoPagerAdapter(
                                 val pas = ((event.x - h.dragStartX) / 15f).toInt()
                                 val target = h.dragStartPosMs + pas * SEEK_STEP_MS
                                 player.seekTo(target.coerceIn(0L, durata))
+                                // indicator vizual (bară jos + timp)
+                                showSeekIndicator(h, target.coerceIn(0L, durata), durata)
                             }
                             return@setOnTouchListener true
                         }
@@ -372,6 +387,7 @@ class VideoPagerAdapter(
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    hideIndicators(h)
                     val eraScroll = h.dragMod == 4
                     h.dragMod = 0
                     h.dragZona = 0
@@ -394,11 +410,12 @@ class VideoPagerAdapter(
 
     override fun onViewRecycled(holder: VH) {
         super.onViewRecycled(holder)
-        // reset fallback dim ca să nu rămână pe altă pagină
+        // reset fallback dim + indicatoare ca să nu rămână pe altă pagină
         holder.dimOverlay?.let { ov ->
             ov.alpha = 0f
             ov.visibility = View.INVISIBLE
         }
+        hideIndicators(holder)
         val position = holder.adapterPosition
         if (position != RecyclerView.NO_POSITION) {
             val videoName = names.getOrElse(position) { "unknown" }
@@ -491,6 +508,50 @@ class VideoPagerAdapter(
     private fun canWriteBrightness(): Boolean = try {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.M || android.provider.Settings.System.canWrite(context)
     } catch (e: Exception) { false }
+
+    // ===== indicatoare vizuale (fallback slider) =====
+    // Bara verticală (stânga=lumina, dreapta=volum) umplută după nivel; se ascunde la UP.
+    private fun setVerticalFill(fill: View, level: Float) {
+        fill.post {
+            val parentV = fill.parent as? View
+            val hMax = (parentV?.height ?: 200).coerceAtLeast(40)
+            val nh = (hMax * level.coerceIn(0f, 1f)).toInt().coerceAtLeast(if (level > 0.01f) 6 else 0)
+            val lp = fill.layoutParams ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, nh)
+            lp.height = nh
+            fill.layoutParams = lp
+        }
+    }
+    private fun showVerticalIndicator(holder: VH?, kind: Int, level: Float) {
+        holder ?: return
+        if (kind == 2) { // luminozitate (stânga)
+            holder.brightnessIndicator.visibility = View.VISIBLE
+            setVerticalFill(holder.brightnessFill, level)
+            holder.volumeIndicator.visibility = View.GONE
+        } else if (kind == 1) { // volum (dreapta)
+            holder.volumeIndicator.visibility = View.VISIBLE
+            setVerticalFill(holder.volumeFill, level)
+            holder.brightnessIndicator.visibility = View.GONE
+        }
+    }
+    private fun showSeekIndicator(holder: VH?, posMs: Long, durMs: Long) {
+        holder ?: return
+        holder.seekIndicator.visibility = View.VISIBLE
+        val p = (if (durMs > 0) ((posMs * 1000) / durMs).toInt() else 0).coerceIn(0, 1000)
+        holder.seekProgress.progress = p
+        holder.seekTime.text = "${fmtTimp(posMs)} / ${fmtTimp(durMs)}"
+    }
+    private fun hideIndicators(holder: VH?) {
+        holder ?: return
+        holder.brightnessIndicator.visibility = View.GONE
+        holder.volumeIndicator.visibility = View.GONE
+        holder.seekIndicator.visibility = View.GONE
+    }
+    private fun fmtTimp(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        val m = s / 60
+        val sec = s % 60
+        return "$m:${if (sec < 10) "0" else ""}$sec"
+    }
 
     fun setVolume(v: Float) {
         currentVolume = v
