@@ -35,7 +35,7 @@ class ZoomableImageView @JvmOverloads constructor(
             zoom = newZoom
             clampPan()
             imageMatrix = displayMatrix
-            requestDisallowInterceptTouchEvent(true)
+            disallowParent(true)
             return true
         }
     })
@@ -50,11 +50,16 @@ class ZoomableImageView @JvmOverloads constructor(
                 resetZoom()
             }
             imageMatrix = displayMatrix
-            requestDisallowInterceptTouchEvent(zoom > 1f)
+            disallowParent(zoom > 1f)
             return true
         }
     }
     private val gestureDetector = android.view.GestureDetector(context, doubleTap)
+
+    /** ceri părintelui (RecyclerView-ul ViewPager2) să NU mai intercepteze gestul */
+    private fun disallowParent(disallow: Boolean) {
+        parent?.requestDisallowInterceptTouchEvent(disallow)
+    }
 
     init {
         scaleType = ImageView.ScaleType.MATRIX
@@ -134,7 +139,7 @@ class ZoomableImageView @JvmOverloads constructor(
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                requestDisallowInterceptTouchEvent(true)
+                disallowParent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -144,22 +149,22 @@ class ZoomableImageView @JvmOverloads constructor(
                 lastY = event.y
                 if (event.pointerCount > 1) {
                     // pinch deja gestionat de scaleDetector
-                    requestDisallowInterceptTouchEvent(true)
+                    disallowParent(true)
                     return true
                 }
                 if (zoom > 1f) {
                     displayMatrix.postTranslate(dx, dy)
                     clampPan()
                     imageMatrix = displayMatrix
-                    requestDisallowInterceptTouchEvent(true)
+                    disallowParent(true)
                     return true
                 }
                 // la 1x: lăsăm ViewPager2 să deruleze (următoarea poză)
-                requestDisallowInterceptTouchEvent(false)
+                disallowParent(false)
                 return false
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                requestDisallowInterceptTouchEvent(zoom > 1f)
+                disallowParent(zoom > 1f)
                 return true
             }
         }
