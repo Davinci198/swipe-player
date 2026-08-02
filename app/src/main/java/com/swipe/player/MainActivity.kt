@@ -42,8 +42,14 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private lateinit var modeVideoBtn: TextView
     private lateinit var modePhotoBtn: TextView
     private lateinit var photoControlsBar: View
+    private lateinit var photoBottomPanel: View
+    private lateinit var photoThumbStrip: androidx.recyclerview.widget.RecyclerView
+    private lateinit var photoRenameBtn: android.widget.ImageButton
     private lateinit var photoBrightnessSeek: android.widget.SeekBar
     private lateinit var photoVolumeSeek: android.widget.SeekBar
+    private var thumbAdapter: ThumbnailAdapter? = null
+    private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val ascundeFotoCtrls = Runnable { ascundeControaleFoto() }
     private lateinit var prefs: SharedPreferences
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
@@ -65,9 +71,34 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         modeVideoBtn = findViewById(R.id.modeVideoBtn)
         modePhotoBtn = findViewById(R.id.modePhotoBtn)
         photoControlsBar = findViewById(R.id.photoControlsBar)
+        photoBottomPanel = findViewById(R.id.photoBottomPanel)
+        photoThumbStrip = findViewById(R.id.photoThumbStrip)
+        photoRenameBtn = findViewById(R.id.photoRenameBtn)
         photoBrightnessSeek = findViewById(R.id.photoBrightnessSeek)
         photoVolumeSeek = findViewById(R.id.photoVolumeSeek)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        // miniaturi (navigare rapidă prin poze)
+        photoThumbStrip.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(
+            this, androidx.recyclerview.widget.RecyclerView.HORIZONTAL, false)
+
+        // creionul redenumește POZA AFIȘATĂ în prezent (fără să se mai suprapună cu setările)
+        photoRenameBtn.setOnClickListener {
+            deschideRedenumire(imagePager.currentItem)
+            afiseazaControaleFoto()
+        }
+
+        // când schimbi poza din galerie, evidențiem miniatura corespunzătoare
+        imagePager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                thumbAdapter?.let { ta ->
+                    photoThumbStrip.post { ta.notifyDataSetChanged() }
+                    photoThumbStrip.scrollToPosition(position)
+                }
+                // interacțiune => resetăm cronometrul de ascundere a controalelor
+                planificaAscundere()
+            }
+        })
 
         // bara de control foto (jos, doar în modul Poze): luminozitate + volum
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
@@ -127,8 +158,16 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val video = mod == "video"
         viewPager.visibility = if (video && adapter != null) View.VISIBLE else View.GONE
         imagePager.visibility = if (!video && photoAdapter != null) View.VISIBLE else View.GONE
-        // bara de control foto (luminozitate/volum) — DOAR în modul Poze
-        photoControlsBar.visibility = if (!video) View.VISIBLE else View.GONE
+        // panoul foto (miniaturi + controale) + creionul — DOAR în modul Poze
+        if (!video) {
+            photoBottomPanel.visibility = View.VISIBLE
+            photoRenameBtn.visibility = View.VISIBLE
+            afiseazaControaleFoto()
+        } else {
+            photoBottomPanel.visibility = View.GONE
+            photoRenameBtn.visibility = View.GONE
+            uiHandler.removeCallbacks(ascundeFotoCtrls)
+        }
         // evidențiază butonul activ
         modeVideoBtn.setBackgroundColor(if (video) 0x33FFFFFF.toInt() else 0x00000000)
         modePhotoBtn.setBackgroundColor(if (!video) 0x33FFFFFF.toInt() else 0x00000000)
@@ -269,10 +308,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Toast.makeText(this, "Nu s-a selectat nicio poză", Toast.LENGTH_SHORT).show()
             return
         }
-        val nouAdapter = ImagePagerAdapter(this, lista, onRename = { pos -> deschideRedenumire(pos) })
+        val nouAdapter = ImagePagerAdapter(this, lista)
         photoAdapter = nouAdapter
         imagePager.adapter = nouAdapter
         imagePager.setCurrentItem(0, false)
+        actualizeazaMiniaturi()
         setMod("photo")
         tvStatus.text = "🖼️ ${lista.size} poze"
     }
@@ -296,10 +336,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 if (noulNume.isEmpty()) return@setPositiveButton
                 val reusit = redenumestePoza(uri, noulNume)
                 if (reusit != null) {
-                    // actualizează lista + persistă + reîncarcă galeria
+                    // actualizează lista + persistă + actualizează galeria curentă (fără a sări la prima poză)
                     poze[position] = reusit
                     salveazaPoze()
-                    incarcaPoze(poze)
+                    actualizeazaMiniaturi()
+                    photoAdapter?.notifyItemChanged(position)
                     Toast.makeText(this, "Poza redenumită ✔", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Nu am putut redenumi. Poate este .jpg .png .gif .bmp .webp", Toast.LENGTH_LONG).show()
@@ -353,6 +394,37 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     private fun nomFisier(nume: String): String {
         return if (nume.contains('.')) nume else "$nume.jpg"
+    }
+
+    // ===== Auto-hide controale foto (creion + bară luminozitate/volum), după 3s =====
+    private fun afiseazaControaleFoto() {
+        photoControlsBar.alpha = 1f
+        photoControlsBar.visibility = View.VISIBLE
+        photoRenameBtn.alpha = 1f
+        photoRenameBtn.visibility = View.VISIBLE
+        planificaAscundere()
+    }
+
+    private fun planificaAscundere() {
+        uiHandler.removeCallbacks(ascundeFotoCtrls)
+        uiHandler.postDelayed(ascundeFotoCtrls, 3000)
+    }
+
+    private fun ascundeControaleFoto() {
+        if (modCurent != "photo") return
+        photoControlsBar.animate().alpha(0f).setDuration(250)
+            .withEndAction { if (modCurent == "photo") photoControlsBar.visibility = View.GONE }
+        photoRenameBtn.animate().alpha(0f).setDuration(250)
+            .withEndAction { if (modCurent == "photo") photoRenameBtn.visibility = View.GONE }
+    }
+
+    private fun actualizeazaMiniaturi() {
+        val curent = imagePager.currentItem.coerceIn(0, (poze.size - 1).coerceAtLeast(0))
+        thumbAdapter = ThumbnailAdapter(this, poze, curent) { pos ->
+            imagePager.setCurrentItem(pos, false)
+            afiseazaControaleFoto()
+        }
+        photoThumbStrip.adapter = thumbAdapter
     }
 
     private fun incarcaLista(lista: List<Uri>) {

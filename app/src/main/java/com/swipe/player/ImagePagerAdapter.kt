@@ -25,8 +25,7 @@ import java.util.concurrent.Executors
  */
 class ImagePagerAdapter(
     private val context: Context,
-    private val items: List<Uri>,
-    private val onRename: (position: Int) -> Unit = { _ -> }
+    private val items: List<Uri>
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerAdapter.ImgVH>() {
 
     private val loaderQueue = Executors.newSingleThreadExecutor()
@@ -42,7 +41,6 @@ class ImagePagerAdapter(
     class ImgVH(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
         val image: ImageView = view.findViewById(R.id.imgPhoto)
         val loading: ProgressBar = view.findViewById(R.id.imgLoading)
-        val renameBtn: View = view.findViewById(R.id.imgRenameBtn)
         var pendingUri: String? = null
     }
 
@@ -60,10 +58,6 @@ class ImagePagerAdapter(
         recyclaBitmapActual(holder, key)
         holder.image.setImageDrawable(null)
         holder.loading.visibility = View.VISIBLE
-
-        holder.renameBtn.setOnClickListener {
-            onRename(holder.bindingAdapterPosition)
-        }
 
         cache.get(key)?.let { bmp ->
             if (holder.pendingUri == key && !bmp.isRecycled) {
@@ -135,10 +129,40 @@ class ImagePagerAdapter(
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.RGB_565
         }
-        return try {
+        val bmp = try {
             context.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, opts)
             }
-        } catch (e: Exception) { null }
+        } catch (e: Exception) { null } ?: return null
+        // rotește după EXIF (ideal #3 — pozele cu telefonul în lateral apar drept)
+        return aplicaRotatie(uri, bmp)
+    }
+
+    private fun aplicaRotatie(uri: Uri, bmp: Bitmap): Bitmap {
+        val deg = citesteExif(uri)
+        if (deg == 0) return bmp
+        val m = android.graphics.Matrix().apply { postRotate(deg.toFloat()) }
+        val rot = try {
+            Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+        } catch (e: Exception) { return bmp }
+        if (rot !== bmp) bmp.recycle()
+        return rot
+    }
+
+    private fun citesteExif(uri: Uri): Int {
+        return try {
+            val fd = context.contentResolver.openAssetFileDescriptor(uri, "r")
+                ?: return 0
+            fd.use {
+                val exif = android.media.ExifInterface(fd.fileDescriptor)
+                when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL)) {
+                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                    else -> 0
+                }
+            }
+        } catch (e: Exception) { 0 }
     }
 }

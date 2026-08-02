@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -81,6 +82,33 @@ class VideoPagerAdapter(
     // pool de ExoPlayer refolosiți (evită crearea a 100+ jucători pt. 100 de videoclipuri)
     private val pool = java.util.ArrayDeque<ExoPlayer>()
     private val MAX_POOL = 3
+
+    // ===== Pinch ZOOM pe video (experimental, aditiv; nu atinge gesturile cu un deget) =====
+    private var pinchPlayerView: PlayerView? = null
+    private var videoZoom = 1f
+
+    private val pinchListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val pv = pinchPlayerView ?: return false
+            val newZoom = (videoZoom * detector.scaleFactor).coerceIn(1f, 4f)
+            pv.scaleX = newZoom
+            pv.scaleY = newZoom
+            // centrare pe focalizare (simplu: pivot la centru)
+            pv.pivotX = pv.width / 2f
+            pv.pivotY = pv.height / 2f
+            videoZoom = newZoom
+            return true
+        }
+    }
+    private val pinchDetector = ScaleGestureDetector(context, pinchListener)
+
+    private fun resetVideoZoom(p: PlayerView?) {
+        p?.also {
+            it.scaleX = 1f
+            it.scaleY = 1f
+        }
+        videoZoom = 1f
+    }
 
     private fun acquirePlayer(): ExoPlayer {
         val p: ExoPlayer
@@ -217,6 +245,7 @@ class VideoPagerAdapter(
         live[position] = player
         holder.playerView.player = player
         holder.playerView.setControllerShowTimeoutMs(2000) // controllerul dispare mai repede
+        resetVideoZoom(holder.playerView) // fără zoom rămas din holder-ul reciclat
         // aplică starea de luminozitate pe paginile nou afișate (fallback dim vizibil)
         aplicaDim(holder, currentBrightness)
         // NU pornim automat - doar videoclipul activ porneste (prin setActivePage)
@@ -263,7 +292,11 @@ class VideoPagerAdapter(
                     return true
                 }
                 override fun onDoubleTap(e: MotionEvent): Boolean {
-                    togglePlay(holder, player) // 2 tap = play/pause
+                    if (videoZoom > 1f) {
+                        resetVideoZoom(holder.playerView) // dublu-tap = reset zoom video
+                    } else {
+                        togglePlay(holder, player) // 2 tap = play/pause
+                    }
                     return true
                 }
             }
@@ -272,6 +305,12 @@ class VideoPagerAdapter(
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
         h.touchCatcher.setOnTouchListener { view, event ->
+            // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating)
+            if (event.pointerCount > 1) {
+                pinchPlayerView = holder.playerView
+                pinchDetector.onTouchEvent(event)
+                return@setOnTouchListener true
+            }
             // GestureDetector pentru tap/dublu-tap (play/pause/controller)
             if (event.actionMasked == MotionEvent.ACTION_UP) {
                 gesture.onTouchEvent(event)
