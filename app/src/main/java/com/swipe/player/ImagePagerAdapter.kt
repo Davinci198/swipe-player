@@ -1,29 +1,46 @@
 package com.swipe.player
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
-import android.util.Log
+import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
+import java.util.concurrent.Executors
 
 /**
  * Galerie de POZE (swipe vertical, separat de videoclipuri).
- * Fiecare pagină = o poză full-screen, încărcată eficient (downsampliată la dimensiunea ecranului).
+ * Încărcare eficientă și SIGURĂ la nivel de memorie, ca să NU se închidă aplicația
+ * la selectarea mai multor poze (crash multi-select = OOM la decodare simultană):
+ *  - LruCache pe bitmap-uri decodate (cheie = uri),
+ *  - downsampling la dimensiunea ecranului + RGB_565 (jumătate de memorie),
+ *  - decodare SERIALIZATĂ (un singur thread worker) => fără vârfuri de heap,
+ *  - reciclarea bitmap-urilor înlocuite / reciclate de RecyclerView.
  */
 class ImagePagerAdapter(
     private val context: Context,
     private val items: List<Uri>
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerAdapter.ImgVH>() {
 
-    private val TAG = "ImagePagerAdapter"
+    private val loaderQueue = Executors.newSingleThreadExecutor()
+    private val cache: LruCache<String, Bitmap>
+
+    init {
+        val maxMem = (Runtime.getRuntime().maxMemory() / 8).toInt()
+        cache = object : LruCache<String, Bitmap>(maxMem.coerceAtLeast(8 * 1024 * 1024)) {
+            override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+        }
+    }
 
     class ImgVH(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
         val image: ImageView = view.findViewById(R.id.imgPhoto)
         val loading: ProgressBar = view.findViewById(R.id.imgLoading)
+        var pendingUri: String? = null
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ImgVH {
@@ -35,38 +52,84 @@ class ImagePagerAdapter(
 
     override fun onBindViewHolder(holder: ImgVH, position: Int) {
         val uri = items[position]
+        val key = uri.toString()
+        holder.pendingUri = key
+        recyclaBitmapActual(holder, key)
         holder.image.setImageDrawable(null)
         holder.loading.visibility = View.VISIBLE
-        // decodează în background, ca să nu blochez pe main thread
-        Thread {
-            try {
-                val bmp = decodeSampled(uri)
-                holder.image.post {
-                    if (bmp != null) {
-                        holder.image.setImageBitmap(bmp)
-                    }
-                    holder.loading.visibility = View.GONE
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Eroare încărcare poză", e)
-                holder.image.post { holder.loading.visibility = View.GONE }
+
+        cache.get(key)?.let { bmp ->
+            if (holder.pendingUri == key && !bmp.isRecycled) {
+                holder.image.setImageBitmap(bmp)
+                holder.loading.visibility = View.GONE
             }
-        }.start()
+            return
+        }
+
+        loaderQueue.execute {
+            val bmp = decodeSampled(uri)
+            if (bmp != null) cache.put(key, bmp)
+            holder.image.post {
+                if (holder.pendingUri == key && bmp != null && !bmp.isRecycled) {
+                    holder.image.setImageBitmap(bmp)
+                }
+                holder.loading.visibility = View.GONE
+            }
+        }
     }
 
-    /** decodează bitmap-ul downsampelat, astfel încât să nu sară memoria pe poze mari */
-    private fun decodeSampled(uri: Uri): android.graphics.Bitmap? {
+    override fun onViewRecycled(holder: ImgVH) {
+        super.onViewRecycled(holder)
+        holder.pendingUri = null
+        recicleazaDacaNuEInCache(holder)
+        holder.image.setImageDrawable(null)
+    }
+
+    /** reciclează bitmap-ul curent dacă NU e referit de cache */
+    private fun recyclaBitmapActual(holder: ImgVH, keyNou: String) {
+        val d = holder.image.drawable
+        if (d is BitmapDrawable) {
+            val b = d.bitmap
+            if (b != null && !b.isRecycled && cache.get(keyNou) !== b && !isInCache(b)) {
+                b.recycle()
+            }
+        }
+    }
+
+    private fun recicleazaDacaNuEInCache(holder: ImgVH) {
+        val d = holder.image.drawable
+        if (d is BitmapDrawable) {
+            val b = d.bitmap
+            if (b != null && !b.isRecycled && !isInCache(b)) b.recycle()
+        }
+    }
+
+    private fun isInCache(b: Bitmap): Boolean {
+        for (e in cache.snapshot().values) {
+            if (e === b) return true
+        }
+        return false
+    }
+
+    /** decodează bitmap-ul downsampliat la dimensiunea ecranului (RAM mic) */
+    private fun decodeSampled(uri: Uri): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        try { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } }
-        catch (e: Exception) { return null }
+        try {
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+        } catch (e: Exception) { return null }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         val vizW = context.resources.displayMetrics.widthPixels
         val vizH = context.resources.displayMetrics.heightPixels
         var sample = 1
-        while (bounds.outWidth / sample > vizW * 1.5 || bounds.outHeight / sample > vizH * 1.5) {
+        while (bounds.outWidth / sample > vizW || bounds.outHeight / sample > vizH) {
             sample *= 2
         }
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
         return try {
             context.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, opts)
