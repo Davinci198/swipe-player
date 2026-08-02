@@ -15,6 +15,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.ui.PlayerView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.AudioAttributes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
@@ -76,16 +77,44 @@ class VideoPagerAdapter(
 
     private fun acquirePlayer(): ExoPlayer {
         val p = if (pool.isNotEmpty()) pool.removeFirst()
-        else ExoPlayer.Builder(context).setTrackSelector(trackSelector).build()
+        else ExoPlayer.Builder(context)
+            .setTrackSelector(trackSelector)
+            .setAudioAttributes(AudioAttributes.DEFAULT, true) // gestionează audio focus
+            .build()
         p.clearMediaItems()
         return p
     }
 
     private fun releasePlayer(p: ExoPlayer) {
+        p.volume = 0f
+        p.playWhenReady = false
+        p.pause()
         p.stop()
         p.clearMediaItems()
-        p.playWhenReady = false
         if (pool.size < MAX_POOL) pool.addLast(p) else p.release()
+    }
+
+    /** Toți ExoPlayerii aflați în uz sau în pool (pentru pause/resume global) */
+    private fun allPlayers(): Collection<ExoPlayer> =
+        LinkedHashSet<ExoPlayer>().apply { addAll(live.values); addAll(pool) }
+
+    /**
+     * Oprește toată redarea (apelat la onPause/onStop - când app merge în fundal).
+     * Nu distruge playerii, doar îi pune în pauză și taie sunetul.
+     */
+    fun pauseAllPlayers() {
+        for (p in allPlayers()) {
+            p.playWhenReady = false
+            p.volume = 0f
+            p.pause()
+        }
+    }
+
+    /**
+     * Reia doar videoclipul activ (apelat la onResume - când app revine în prim-plan).
+     */
+    fun resumeActivePlayer() {
+        playerActiv?.let { it.volume = currentVolume; it.playWhenReady = true; it.play() }
     }
 
     private val SEEK_STEP_MS = 10_000L // swipe orizontal = derulare in pas de 10 sec
@@ -107,7 +136,7 @@ class VideoPagerAdapter(
         var dragStartVal = 0f
         var dragStartPosMs = 0L
         var seekActive = false
-        val dragThreshold = 40f // prag activare gest (px)
+        val dragThreshold = 15f // prag activare gest (px) - sub 15px nu interceptăm
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
@@ -194,9 +223,9 @@ class VideoPagerAdapter(
             }
         )
 
-        // pragul lateral: sub acest % din lățime = luminozitate, peste = volum
-        val limitaStanga = 0.42f
-        val limitaDreapta = 0.58f
+        // marginea laterală (45dp) în pixeli: stânga = luminozitate, dreapta = volum,
+        // mijlocul larg rămâne exclusiv pentru scroll vertical (schimbarea videoclipului)
+        val marginePx = 45f * context.resources.displayMetrics.density
 
         val h = holder // referință locală pentru readabilitate
         h.playerView.setOnTouchListener { view, event ->
@@ -223,14 +252,19 @@ class VideoPagerAdapter(
                                 h.dragMod = 3 // seek
                                 view.parent?.requestDisallowInterceptTouchEvent(true)
                             } else {
+                                // abia după depășirea pragului vertical (15px) decidem zona
                                 if (kotlin.math.abs(dy) < h.dragThreshold) return@setOnTouchListener true
-                                val raportX = event.x / view.width.toFloat().coerceAtLeast(1f)
-                                view.parent?.requestDisallowInterceptTouchEvent(false)
+                                val w = view.width.toFloat().coerceAtLeast(1f)
                                 h.dragMod = when {
-                                    raportX < limitaStanga -> 2 // luminozitate
-                                    raportX > limitaDreapta -> 1 // volum
-                                    else -> 4 // scroll vertical => lasă ViewPager2
+                                    event.x < marginePx -> 2 // luminozitate (marginea stânga, 45dp)
+                                    event.x > w - marginePx -> 1 // volum (marginea dreapta, 45dp)
+                                    else -> 4 // mijloc => scroll vertical, lasă ViewPager2
                                 }
+                                if (h.dragMod == 4) {
+                                    // NU cerem requestDisallow -> ViewPager2 interceptează scroll-ul
+                                    return@setOnTouchListener false
+                                }
+                                view.parent?.requestDisallowInterceptTouchEvent(true)
                             }
                         }
                         2 -> { // luminozitate

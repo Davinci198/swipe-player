@@ -188,7 +188,13 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onPause() {
         super.onPause()
+        adapter?.pauseAllPlayers() // oprește audio când app merge în fundal
         salveazaSetarileCurente()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        adapter?.pauseAllPlayers() // garanție suplimentară (ex: Home button)
     }
 
     override fun onResume() {
@@ -198,6 +204,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (luminozitateCurenta in 0.3f..1.0f) {
             aplicaLumina(luminozitateCurenta)
         }
+        adapter?.resumeActivePlayer() // la întoarcere doar videoclipul activ pornește
     }
 
     override fun onDestroy() {
