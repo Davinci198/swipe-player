@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Swipe Player PRO</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;color:#fff;overscroll-behavior:none}
+#app{position:relative;width:100%;height:100dvh;background:#000;overflow:hidden;touch-action:none}
+#video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+#topbar{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top));background:linear-gradient(to bottom,rgba(0,0,0,.7),transparent);pointer-events:none}
+#topbar *{pointer-events:auto}
+#counter{font-size:13px;font-weight:600;letter-spacing:.04em;opacity:.9;background:rgba(255,255,255,.12);padding:6px 10px;border-radius:20px;backdrop-filter:blur(10px)}
+#uploadBtn{font-size:13px;font-weight:700;background:#fff;color:#000;border:0;padding:8px 14px;border-radius:20px;cursor:pointer}
+#center{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#playIcon{width:80px;height:80px;background:rgba(255,255,255,.15);backdrop-filter:blur(12px);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.8);transition:all .22s ease;pointer-events:none}
+#playIcon.show{opacity:1;transform:scale(1)}
+#indicators{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;display:flex;gap:50vw;pointer-events:none;width:100%;justify-content:center}
+.ind{opacity:0;transform:translateY(10px) scale(.95);transition:all .18s ease;background:rgba(20,20,20,.86);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.1);padding:14px 18px;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:96px}
+.ind.show{opacity:1;transform:translateY(0) scale(1)}
+.ind b{font-size:22px;font-weight:800}
+.ind span{font-size:11px;letter-spacing:.08em;opacity:.6;text-transform:uppercase}
+#seekHint{position:absolute;top:50%;z-index:15;transform:translateY(-50%);display:flex;align-items:center;gap:8px;background:rgba(20,20,20,.9);padding:10px 16px;border-radius:24px;font-weight:700;font-size:14px;opacity:0;transition:all .2s ease;pointer-events:none;border:1px solid rgba(255,255,255,.12)}
+#seekHint.left{left:18px}
+#seekHint.right{right:18px}
+#seekHint.show{opacity:1}
+#bottom{position:absolute;left:0;right:0;bottom:0;z-index:20;padding:14px 14px;padding-bottom:max(14px,env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(0,0,0,.85),transparent 92%);pointer-events:none}
+#bottom *{pointer-events:auto}
+#progWrap{height:3px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;cursor:pointer;position:relative}
+#prog{height:100%;background:#fff;width:0%;border-radius:99px;transition:width .08s linear}
+#metaRow{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px}
+#time{font-size:12px;font-variant-numeric:tabular-nums;opacity:.75;font-weight:500}
+#name{font-size:12px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56%}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:30;background:#000;padding:32px;text-align:center}
+#emptyIcon{width:84px;height:84px;border-radius:28px;background:#111;border:1px solid #222;display:flex;align-items:center;justify-content:center;font-size:34px}
+#empty h2{font-size:20px;font-weight:800;letter-spacing:-.02em}
+#empty p{font-size:14px;opacity:.55;line-height:1.5;max-width:300px}
+#emptyBtn{margin-top:6px;background:#fff;color:#000;border:0;padding:14px 22px;border-radius:14px;font-weight:800;font-size:15px;cursor:pointer}
+#swipeHint{position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:9;writing-mode:vertical-rl;opacity:.18;font-size:11px;letter-spacing:.18em;text-transform:uppercase;pointer-events:none}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" playsinline webkit-playsinline preload="metadata" crossorigin="anonymous"></video>
+  <div id="topbar">
+    <div id="counter">0 / 0</div>
+    <button id="uploadBtn">+ VIDEO</button>
+  </div>
+  <div id="center"><div id="playIcon"><svg width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M8 5.14v14l11-7-11-7z"/></svg></div></div>
+  <div id="indicators">
+    <div id="brightInd" class="ind"><span>☀ LUMINA</span><b id="brightVal">100%</b></div>
+    <div id="volInd" class="ind"><span>🔊 VOLUM</span><b id="volVal">100%</b></div>
+  </div>
+  <div id="seekHint" class="left">◀◀ 10s</div>
+  <div id="seekHint2" class="right" style="position:absolute;top:50%;z-index:15;transform:translateY(-50%);right:18px;display:flex;align-items:center;gap:8px;background:rgba(20,20,20,.9);padding:10px 16px;border-radius:24px;font-weight:700;font-size:14px;opacity:0;transition:all .2s ease;pointer-events:none;border:1px solid rgba(255,255,255,.12)">10s ▶▶</div>
+  <div id="swipeHint">SWIPE ↑↓</div>
+  <div id="bottom">
+    <div id="progWrap"><div id="prog"></div></div>
+    <div id="metaRow"><div id="time">0:00 / 0:00</div><div id="name">Nici un video</div></div>
+  </div>
+  <div id="empty">
+    <div id="emptyIcon">▶</div>
+    <h2>Swipe Player PRO</h2>
+    <p>Player arhiva video stil TikTok.<br>Gliseaza sus/jos pentru next.<br>Stanga: luminozitate • Dreapta: volum<br>Dublu tap stanga/dreapta: seek ±10s</p>
+    <button id="emptyBtn">ALEGE VIDEOCLIPURI</button>
+    <p style="font-size:12px;margin-top:4px">Suporta .mp4, .webm, .mov</p>
+  </div>
+</div>
+<input type="file" id="fileInput" accept="video/*" multiple>
+<script>
+(function(){
+  var video=document.getElementById('video');
+  var fileInput=document.getElementById('fileInput');
+  var emptyDiv=document.getElementById('empty');
+  var counter=document.getElementById('counter');
+  var nameEl=document.getElementById('name');
+  var prog=document.getElementById('prog');
+  var progWrap=document.getElementById('progWrap');
+  var timeEl=document.getElementById('time');
+  var playIcon=document.getElementById('playIcon');
+  var volInd=document.getElementById('volInd');
+  var brightInd=document.getElementById('brightInd');
+  var volVal=document.getElementById('volVal');
+  var brightVal=document.getElementById('brightVal');
+  var seekL=document.getElementById('seekHint');
+  var seekR=document.getElementById('seekHint2');
+  var app=document.getElementById('app');
+
+  var list=[];
+  var idx=0;
+  var volume=1;
+  var brightness=1;
+  var hideVolTimer=null;
+  var hideBrightTimer=null;
+  var hidePlayTimer=null;
+  var lastTap=0;
+  var lastTapX=0;
+
+  // ===== Gesturi unificate (derulare + lumina/volum), fara conflict =====
+  // Zone laterale (in % din latime): margine stanga=0..15 (lumina),
+  // margine dreapta=85..100 (volum), mijloc=15..85 (derulare urmator/anterior).
+  var Z_L=0.15, Z_R=0.85;
+  var isDrag=false;      // a fost un drag pe margine (lumina/volum) in acest gest
+  var dragKind='';       // '' (mijloc) | 'bright' | 'vol'
+  var touchStartY=0, touchStartX=0, dragStartY=0, startBright=1, startVol=1;
+
+  function fmt(s){ if(isNaN(s)) return '0:00'; var m=Math.floor(s/60); var sec=Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+  function updateCounter(){ counter.textContent = list.length ? (idx+1)+' / '+list.length : '0 / 0'; }
+
+  function loadList(files){
+    var newItems=[];
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      if(!f.type.startsWith('video/')) continue;
+      var url=URL.createObjectURL(f);
+      newItems.push({url:url, name:f.name});
+    }
+    if(newItems.length){
+      if(list.length===0){ list=newItems; idx=0; playAt(0); }
+      else { var prevLen=list.length; list=list.concat(newItems); idx=prevLen; playAt(idx); }
+      emptyDiv.style.display='none';
+      updateCounter();
+    }
+  }
+
+  function playAt(i){
+    if(!list.length) return;
+    if(i<0) i=0; if(i>=list.length) i=list.length-1;
+    idx=i;
+    var item=list[idx];
+    video.src=item.url;
+    video.load();
+    video.volume=volume;
+    applyBrightness();
+    nameEl.textContent=item.name;
+    updateCounter();
+    var p=video.play(); if(p && p.catch){ p.catch(function(){}); }
+    showPlay(true);
+  }
+
+  function next(){ if(idx < list.length-1) playAt(idx+1); else { pulseHint(); } }
+  function prev(){ if(idx>0) playAt(idx-1); else { pulseHint(); } }
+
+  function pulseHint(){
+    var h=document.getElementById('swipeHint');
+    h.style.transition='none'; h.style.opacity='0.5';
+    setTimeout(function(){ h.style.transition='opacity .4s'; h.style.opacity='0.18'; },120);
+  }
+
+  function togglePlay(){
+    if(!list.length) return;
+    if(video.paused){ video.play(); showPlay(true); }
+    else { video.pause(); showPlay(false); }
+  }
+
+  function showPlay(isPlaying){
+    playIcon.innerHTML = isPlaying ? '<svg width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M8 5.14v14l11-7-11-7z"/></svg>' : '<svg width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    playIcon.classList.add('show');
+    clearTimeout(hidePlayTimer);
+    hidePlayTimer=setTimeout(function(){ playIcon.classList.remove('show'); }, isPlaying?400:900);
+  }
+
+  // progress
+  video.addEventListener('timeupdate', function(){
+    var pct = video.duration ? (video.currentTime/video.duration)*100 : 0;
+    prog.style.width=pct+'%';
+    timeEl.textContent=fmt(video.currentTime)+' / '+fmt(video.duration||0);
+  });
+  video.addEventListener('ended', function(){ if(idx < list.length-1) next(); });
+
+  progWrap.addEventListener('click', function(e){
+    if(!video.duration) return;
+    var rect=progWrap.getBoundingClientRect();
+    var x=e.clientX - rect.left;
+    var pct=x/rect.width;
+    video.currentTime=pct*video.duration;
+  });
+
+  // brightness / volume
+  function applyBrightness(){ video.style.filter='brightness('+brightness+')'; brightVal.textContent=Math.round(brightness*100)+'%'; }
+  function showBright(){ brightInd.classList.add('show'); clearTimeout(hideBrightTimer); hideBrightTimer=setTimeout(function(){ brightInd.classList.remove('show'); },900); }
+  function showVol(){ volInd.classList.add('show'); clearTimeout(hideVolTimer); hideVolTimer=setTimeout(function(){ volInd.classList.remove('show'); },900); }
+
+  // ---- TOUCH UNIFICAT: un singur sistem, decizia pe zona de start ----
+  function inTopBarOrBottom(e){ return !!(e.target && (e.target.closest('#topbar') || e.target.closest('#bottom') || e.target.closest('#progWrap'))); }
+
+  app.addEventListener('touchstart', function(e){
+    if(inTopBarOrBottom(e)) return;
+    var t=e.touches[0];
+    touchStartX=t.clientX; touchStartY=t.clientY;
+    dragStartY=t.clientY;
+    isDrag=false; dragKind='';
+    startBright=brightness; startVol=volume;
+    var w=window.innerWidth||1;
+    if(t.clientX < w*Z_L) dragKind='bright';          // margine stanga -> lumina
+    else if(t.clientX > w*Z_R) dragKind='vol';       // margine dreapta -> volum
+    else dragKind='';                                 // mijloc -> derulare
+  }, {passive:true});
+
+  app.addEventListener('touchmove', function(e){
+    if(inTopBarOrBottom(e)) return;
+    if(dragKind==='') return; // mijloc: derularea se decide pe touchend (mai fiabil)
+    var t=e.touches[0];
+    var dy=dragStartY - t.clientY;
+    if(!isDrag && Math.abs(dy)<8) return; // prag de activare
+    isDrag=true;
+    if(e.cancelable) e.preventDefault();
+    var h=window.innerHeight||1;
+    if(dragKind==='bright'){
+      brightness=Math.min(1.7, Math.max(0.2, startBright + dy/(h*0.6)));
+      applyBrightness(); showBright();
+    } else {
+      volume=Math.min(1, Math.max(0, startVol + dy/(h*0.6)));
+      video.volume=volume; volVal.textContent=Math.round(volume*100)+'%'; showVol();
+    }
+  }, {passive:false});
+
+  app.addEventListener('touchend', function(e){
+    if(inTopBarOrBottom(e)) return;
+    if(isDrag || dragKind!==''){ isDrag=false; dragKind=''; return; } // a fost gest pe margine
+    var t=e.changedTouches[0];
+    var dy=t.clientY - touchStartY;
+    var dx=t.clientX - touchStartX;
+    var absY=Math.abs(dy), absX=Math.abs(dx);
+    var now=Date.now();
+    var isDouble=(now-lastTap)<300 && Math.abs(t.clientX-lastTapX)<80;
+    if(absY<18 && absX<18){
+      if(isDouble){
+        if(t.clientX<window.innerWidth/2){ video.currentTime=Math.max(0,video.currentTime-10); seekL.classList.add('show'); setTimeout(function(){ seekL.classList.remove('show'); },500); }
+        else { video.currentTime=Math.min(video.duration||9999,video.currentTime+10); seekR.style.opacity='1'; setTimeout(function(){ seekR.style.opacity='0'; },500); }
+        lastTap=0; return;
+      }
+      togglePlay(); lastTap=now; lastTapX=t.clientX; return;
+    }
+    if(absY>60 && absY>absX){ if(dy<0) next(); else prev(); }
+    lastTap=0;
+  }, {passive:true});
+
+  // mouse wheel swipe (desktop)
+  var wheelLock=false;
+  app.addEventListener('wheel', function(e){
+    if(Math.abs(e.deltaY) < 20) return;
+    if(wheelLock) return;
+    wheelLock=true;
+    if(e.deltaY > 0) next(); else prev();
+    setTimeout(function(){ wheelLock=false; },600);
+  }, {passive:true});
+
+  // double click seek (desktop)
+  app.addEventListener('dblclick', function(e){
+    if(e.target.closest('#topbar') || e.target.closest('#bottom')) return;
+    if(e.clientX < window.innerWidth/2){
+      video.currentTime = Math.max(0, video.currentTime - 10);
+      seekL.classList.add('show'); setTimeout(function(){ seekL.classList.remove('show'); },500);
+    } else {
+      video.currentTime = Math.min(video.duration||9999, video.currentTime + 10);
+      seekR.style.opacity='1'; setTimeout(function(){ seekR.style.opacity='0'; },500);
+    }
+  });
+
+  // keyboard
+  window.addEventListener('keydown', function(e){
+    if(e.code==='ArrowUp'){ prev(); e.preventDefault(); }
+    if(e.code==='ArrowDown'){ next(); e.preventDefault(); }
+    if(e.code==='Space'){ togglePlay(); e.preventDefault(); }
+    if(e.code==='ArrowLeft'){ video.currentTime=Math.max(0,video.currentTime-5); }
+    if(e.code==='ArrowRight'){ video.currentTime=Math.min(video.duration, video.currentTime+5); }
+  });
+
+  // file input + drag & drop
+  document.getElementById('uploadBtn').addEventListener('click', function(){ fileInput.click(); });
+  document.getElementById('emptyBtn').addEventListener('click', function(){ fileInput.click(); });
+  fileInput.addEventListener('change', function(){ if(this.files && this.files.length) loadList(this.files); });
+  app.addEventListener('dragover', function(e){ e.preventDefault(); });
+  app.addEventListener('drop', function(e){
+    e.preventDefault();
+    if(e.dataTransfer.files && e.dataTransfer.files.length) loadList(e.dataTransfer.files);
+  });
+})();
+</script>
+</body>
+</html>
