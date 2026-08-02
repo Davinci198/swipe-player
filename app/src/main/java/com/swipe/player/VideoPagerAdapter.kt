@@ -71,18 +71,64 @@ class VideoPagerAdapter(
     // playerii aflați în uz, pe poziție
     private val live = HashMap<Int, ExoPlayer>()
 
+    // holder-ul viu pentru fiecare player aflat în uz (folosit de listenerul per player)
+    private val playerHolder = HashMap<ExoPlayer, VH>()
+
     // pool de ExoPlayer refolosiți (evită crearea a 100+ jucători pt. 100 de videoclipuri)
     private val pool = java.util.ArrayDeque<ExoPlayer>()
     private val MAX_POOL = 3
 
     private fun acquirePlayer(): ExoPlayer {
-        val p = if (pool.isNotEmpty()) pool.removeFirst()
-        else ExoPlayer.Builder(context)
-            .setTrackSelector(trackSelector)
-            .setAudioAttributes(AudioAttributes.DEFAULT, true) // gestionează audio focus
-            .build()
+        val p: ExoPlayer
+        if (pool.isNotEmpty()) {
+            p = pool.removeFirst()
+        } else {
+            p = ExoPlayer.Builder(context)
+                .setTrackSelector(trackSelector)
+                .setAudioAttributes(AudioAttributes.DEFAULT, true) // gestionează audio focus
+                .build()
+            // listenerul (wrapper per player, care închide DOAR acest [p]) se atașează
+            // o singură dată, la crearea playerului. La reutilizarea din pool NU se mai adaugă
+            // alt listener => fără leak / duplicate callbacks / salvare de progres greșită.
+            p.addListener(creeazaListener(p))
+        }
         p.clearMediaItems()
         return p
+    }
+
+    /** poziția curentă ocupată de un player în listă (-1 dacă nu e în uz) */
+    private fun pozitiePentru(p: ExoPlayer): Int =
+        live.entries.firstOrNull { it.value === p }?.key ?: -1
+
+    /** numele videoclipului pentru un player (dacă e în uz) */
+    private fun numePentru(p: ExoPlayer): String {
+        val poz = pozitiePentru(p)
+        return if (poz in 0 until names.size) names[poz] else "Video"
+    }
+
+    // Wrapper de listener PER PLAYER, atașat o singură dată la crearea playerului.
+    // Închide DOAR lucruri stabile (acest [p] și adapterul [this]), nu holder/nume per
+    // bind, deci la reutilizarea din pool NU se acumulează listeners și NU se scrie
+    // progres pe videoclipul greșit.
+    private fun creeazaListener(p: ExoPlayer): Player.Listener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            val holder = playerHolder[p] ?: return
+            when (playbackState) {
+                Player.STATE_BUFFERING -> holder.loadingContainer.visibility = View.VISIBLE
+                Player.STATE_READY -> holder.loadingContainer.visibility = View.GONE
+                Player.STATE_ENDED -> salveazaProgres(numePentru(p), p, 100)
+            }
+        }
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) salveazaProgresDacaTimpul(numePentru(p), p)
+        }
+        override fun onPositionDiscontinuity(reason: Int) {
+            salveazaProgresDacaTimpul(numePentru(p), p)
+        }
+        override fun onPlayerError(error: PlaybackException) {
+            playerHolder[p]?.loadingContainer?.visibility = View.GONE
+            Log.e(TAG, "Error: ${error.message}")
+        }
     }
 
     private fun releasePlayer(p: ExoPlayer) {
@@ -163,25 +209,9 @@ class VideoPagerAdapter(
 
         val mediaItem = MediaItem.fromUri(uri)
         player.setMediaItem(mediaItem)
-        player.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> holder.loadingContainer.visibility = View.VISIBLE
-                    Player.STATE_READY -> holder.loadingContainer.visibility = View.GONE
-                    Player.STATE_ENDED -> salveazaProgres(videoName, player, 100)
-                }
-            }
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) salveazaProgresDacaTimpul(videoName, player)
-            }
-            override fun onPositionDiscontinuity(reason: Int) {
-                salveazaProgresDacaTimpul(videoName, player)
-            }
-            override fun onPlayerError(error: PlaybackException) {
-                holder.loadingContainer.visibility = View.GONE
-                Log.e(TAG, "Error $videoName: ${error.message}")
-            }
-        })
+        // listener-ul e deja atașat pe acest [player] (adăugat o singură dată la creare).
+        // Păstrăm maparea player->holder pentru ca listenerul să găsească UI-ul corect.
+        playerHolder[player] = holder
         // continuă de unde ai rămas? restaurez poziția salvată, dar NU pornesc automat
         try {
             val istoric = memoryManager.getIstoric(videoName)
@@ -252,19 +282,19 @@ class VideoPagerAdapter(
                                 h.dragMod = 3 // seek
                                 view.parent?.requestDisallowInterceptTouchEvent(true)
                             } else {
-                                // abia după depășirea pragului vertical (15px) decidem zona
-                                if (kotlin.math.abs(dy) < h.dragThreshold) return@setOnTouchListener true
                                 val w = view.width.toFloat().coerceAtLeast(1f)
-                                h.dragMod = when {
-                                    event.x < marginePx -> 2 // luminozitate (marginea stânga, 45dp)
-                                    event.x > w - marginePx -> 1 // volum (marginea dreapta, 45dp)
-                                    else -> 4 // mijloc => scroll vertical, lasă ViewPager2
-                                }
-                                if (h.dragMod == 4) {
-                                    // NU cerem requestDisallow -> ViewPager2 interceptează scroll-ul
+                                val peStanga = event.x < marginePx
+                                val peDreapta = event.x > w - marginePx
+                                if (!peStanga && !peDreapta) {
+                                    // mijloc => imediat scroll vertical, lasă ViewPager2 (fără disallow)
+                                    h.dragMod = 4
                                     return@setOnTouchListener false
                                 }
+                                // pe margine => lumina/volum. Cerem disallow DEVREME (la ~8px =
+                                // touchSlop-ul ViewPager) ca să câștigăm cursa cu scroll-ul vertical.
+                                if (kotlin.math.abs(dy) < 8f) return@setOnTouchListener true
                                 view.parent?.requestDisallowInterceptTouchEvent(true)
+                                h.dragMod = if (peStanga) 2 else 1
                             }
                         }
                         2 -> { // luminozitate
@@ -325,6 +355,7 @@ class VideoPagerAdapter(
         holder.playerView.player = null
         val p = holder.player
         if (playerActiv === p) playerActiv = null
+        p?.let { playerHolder.remove(it) } // scoatem maparea player->holder
         if (p != null) releasePlayer(p) // return în pool, nu eliberăm neapărat
         holder.player = null
     }

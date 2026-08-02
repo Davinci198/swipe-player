@@ -286,7 +286,7 @@ class MemoryManager private constructor(context: Context) {
             val settings = JSONObject(raw)
             val volum = settings.optDouble("volum", 1.0).toFloat()
             val lumina = settings.optDouble("lumina", 1.0).toFloat()
-            Pair(volum.coerceIn(0f, 1f), lumina.coerceIn(0.2f, 1.7f))
+            Pair(volum.coerceIn(0f, 1f), lumina.coerceIn(0.15f, 1f)) // screenBrightness max = 1.0
         } catch (e: Exception) {
             null
         }

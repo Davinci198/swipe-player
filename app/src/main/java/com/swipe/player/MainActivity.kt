@@ -9,9 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -223,19 +221,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             MemoryManager.getInstance(this).salveazaRezolutie(rezolutieCurenta)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
-        }
-    }
-
-    // Euristică de suport 4K: jumătate din dispozitivele cu >= 6GB RAM decodează 4K fără throttling
-    private fun isDeviceSuports4K(): Boolean {
-        return try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            val memInfo = android.app.ActivityManager.MemoryInfo()
-            am.getMemoryInfo(memInfo)
-            val ramTotalGB = memInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
-            ramTotalGB >= 6.0
-        } catch (e: Exception) {
-            false
         }
     }
 

@@ -14,4 +14,3 @@ dependencyResolutionManagement {
 }
 rootProject.name = "swipe-player"
 include(":app")
-include(":dragonbones")
