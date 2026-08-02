@@ -274,8 +274,6 @@ class VideoPagerAdapter(
                     h.seekActive = false
                     h.dragStartX = event.x
                     h.dragStartY = event.y
-                    h.dragStartVal = event.y
-                    h.dragStartPosMs = player.currentPosition
                     // decizie la DOWN, pe baza zonei unde începe atingerea:
                     val w = view.width.toFloat().coerceAtLeast(1f)
                     h.dragZona = when {
@@ -283,6 +281,13 @@ class VideoPagerAdapter(
                         event.x > w - marginePx -> 2 // margine dreapta => volum
                         else -> 0 // mijloc => scroll vertical (ViewPager2)
                     }
+                    // valoarea de pornire = valoarea curenta (nu un pixel!)
+                    h.dragStartVal = when (h.dragZona) {
+                        1 -> currentBrightness // stanga = lumina
+                        2 -> currentVolume     // dreapta = volum
+                        else -> 0f
+                    }
+                    h.dragStartPosMs = player.currentPosition
                     if (h.dragZona != 0) {
                         // blochez scroll-ul ViewPager imediat => lumina/volumul pornesc garantat
                         view.parent?.requestDisallowInterceptTouchEvent(true)
@@ -317,7 +322,8 @@ class VideoPagerAdapter(
                                     true
                                 } else {
                                     if (kotlin.math.abs(dy) < 4f) return@setOnTouchListener true
-                                    h.dragMod = h.dragZona // 1=volum, 2=luminozitate
+                                    // stanga(1)=luminozitate(dragMod 2), dreapta(2)=volum(dragMod 1)
+                                    h.dragMod = if (h.dragZona == 1) 2 else 1
                                     view.parent?.requestDisallowInterceptTouchEvent(true)
                                     true
                                 }
