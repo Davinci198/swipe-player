@@ -254,11 +254,6 @@ class VideoPagerAdapter(
                 }
             }
         )
-
-        // marginea laterală (45dp) în pixeli: stânga = luminozitate, dreapta = volum,
-        // mijlocul larg rămâne exclusiv pentru scroll vertical (schimbarea videoclipului)
-        val marginePx = 45f * context.resources.displayMetrics.density
-
         val h = holder // referință locală pentru readabilitate
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
@@ -279,10 +274,13 @@ class VideoPagerAdapter(
                     h.dragStartY = event.y
                     // decizie la DOWN, pe baza zonei unde începe atingerea:
                     val w = view.width.toFloat().coerceAtLeast(1f)
+                    // zone late: stânga 1/3 = luminozitate, dreapta 1/3 = volum,
+                    // mijloc 1/3 = scroll vertical (schimbă videoclipul) / seek orizontal
+                    val marginePx = w * 0.33f
                     h.dragZona = when {
-                        event.x < marginePx -> 1 // margine stânga => lumină
-                        event.x > w - marginePx -> 2 // margine dreapta => volum
-                        else -> 0 // mijloc => scroll vertical (ViewPager2)
+                        event.x < marginePx -> 1 // stânga => lumină
+                        event.x > w - marginePx -> 2 // dreapta => volum
+                        else -> 0 // mijloc => scroll/seek
                     }
                     // valoarea de pornire = valoarea curenta (nu un pixel!)
                     h.dragStartVal = when (h.dragZona) {

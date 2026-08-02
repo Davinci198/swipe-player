@@ -10,12 +10,6 @@
         android:layout_height="match_parent"
         app:use_controller="true"
         app:resize_mode="fit" />
-    <!-- Perdea de gesturi peste video: prinde swipe-urile (lumina/volum/scroll)
-         fara sa concureze cu controllerul PlayerView. Ramane sub nume/fav. -->
-    <View
-        android:id="@+id/touch_catcher"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -34,6 +28,12 @@
             android:textSize="14sp"
             android:layout_marginTop="16dp" />
     </LinearLayout>
+    <!-- Perdea de gesturi DEASUPRA video si loading: prinde swipe-urile
+         (lumina/volum/seek/scroll). Ramane sub nume si butonul de favorite. -->
+    <View
+        android:id="@+id/touch_catcher"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
     <TextView
         android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
