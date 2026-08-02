@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="16dp"
         android:layout_gravity="top"
-        android:background="@android:color/transparent">
+        android:background="@drawable/bg_top_overlay">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -41,13 +41,14 @@
             android:backgroundTint="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Buton setari: colt stanga jos -->
+    <!-- Buton setari: colț stânga sus, sub header (nu se mai suprapune cu numele video din jos) -->
     <ImageButton
         android:id="@+id/btnSettings"
         android:layout_width="56dp"
         android:layout_height="56dp"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="20dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="16dp"
+        android:layout_marginTop="170dp"
         android:contentDescription="Setări"
         android:background="@drawable/bg_settings"
         android:src="@android:drawable/ic_menu_manage"

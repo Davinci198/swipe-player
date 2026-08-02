@@ -144,6 +144,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Toast.makeText(this, "Nu s-a selectat niciun video", Toast.LENGTH_SHORT).show()
             return
         }
+        // ecranul rămâne treaz cât timp există videoclipuri de redat
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val nouAdapter = VideoPagerAdapter(
             context = this,
             items = lista,
@@ -187,6 +189,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     override fun onPause() {
         super.onPause()
         adapter?.pauseAllPlayers() // oprește audio când app merge în fundal
+        // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
     }
 
@@ -197,6 +201,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onResume() {
         super.onResume()
+        // ecranul rămâne treaz cât timp avem videoclipuri (previne black screen la vizionare)
+        if (adapter != null) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         // Luminozitate: NU restaura automat o valoare prea mică (bug sistem).
         // Reaplicăm doar dacă valoarea e într-un interval rezonabil (0.3..1.0).
         if (luminozitateCurenta in 0.3f..1.0f) {
@@ -207,6 +215,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onDestroy() {
         super.onDestroy()
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
         // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
         try {
