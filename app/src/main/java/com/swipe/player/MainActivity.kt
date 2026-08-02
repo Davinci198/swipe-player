@@ -35,6 +35,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private val PREFS = "swipe_uv"
     private val KEY_URIS = "uris_video"
     private val KEY_PHOTO_URIS = "uris_photo"
+    private val KEY_PHOTO_FAV = "fav_photo"
+    private val KEY_LAST_MODE = "last_mode"
+    private val KEY_LAST_POS = "last_pos"
+    private val favoritesPoze: MutableSet<String> = mutableSetOf()
 
     private lateinit var tvStatus: TextView
     private lateinit var viewPager: ViewPager2
@@ -45,6 +49,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private lateinit var photoBottomPanel: View
     private lateinit var photoThumbStrip: androidx.recyclerview.widget.RecyclerView
     private lateinit var photoRenameBtn: android.widget.ImageButton
+    private lateinit var photoDeleteBtn: android.widget.ImageButton
+    private lateinit var photoFavBtn: android.widget.ImageButton
     private lateinit var photoBrightnessSeek: android.widget.SeekBar
     private lateinit var photoVolumeSeek: android.widget.SeekBar
     private var thumbAdapter: ThumbnailAdapter? = null
@@ -74,6 +80,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         photoBottomPanel = findViewById(R.id.photoBottomPanel)
         photoThumbStrip = findViewById(R.id.photoThumbStrip)
         photoRenameBtn = findViewById(R.id.photoRenameBtn)
+        photoDeleteBtn = findViewById(R.id.photoDeleteBtn)
+        photoFavBtn = findViewById(R.id.photoFavBtn)
         photoBrightnessSeek = findViewById(R.id.photoBrightnessSeek)
         photoVolumeSeek = findViewById(R.id.photoVolumeSeek)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -88,6 +96,18 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             afiseazaControaleFoto()
         }
 
+        // șterge poza afișată
+        photoDeleteBtn.setOnClickListener {
+            afiseazaControaleFoto()
+            confirmareStergere()
+        }
+
+        // comută favorit pentru poza afișată
+        photoFavBtn.setOnClickListener {
+            comutaFavorit(imagePager.currentItem)
+            afiseazaControaleFoto()
+        }
+
         // când schimbi poza din galerie, evidențiem miniatura corespunzătoare
         imagePager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
@@ -95,6 +115,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                     photoThumbStrip.post { ta.notifyDataSetChanged() }
                     photoThumbStrip.scrollToPosition(position)
                 }
+                actualizeazaButonFavorit(position)
                 // interacțiune => resetăm cronometrul de ascundere a controalelor
                 planificaAscundere()
             }
@@ -139,6 +160,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             luminozitateCurenta = setari.second
         }
         rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
+        incarcaFavoritPoze()
         // sincronizează barele foto (luminozitate/volum) cu valorile salvate
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         photoVolumeSeek.progress = (volumCurent * 1000).toInt()
@@ -150,6 +172,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         restaurareLista()
         restaurarePoze()
         setMod("video")
+        // reia de unde ai rămas (mod + poziție) — rezolvă „după închidere nu mai merge”
+        restaureazaStareSesiune()
     }
 
     /** comută între modul de videoclipuri și galeria de poze (ambele cu swipe vertical) */
@@ -162,10 +186,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (!video) {
             photoBottomPanel.visibility = View.VISIBLE
             photoRenameBtn.visibility = View.VISIBLE
+            photoDeleteBtn.visibility = View.VISIBLE
+            photoFavBtn.visibility = View.VISIBLE
+            actualizeazaButonFavorit(imagePager.currentItem)
             afiseazaControaleFoto()
         } else {
             photoBottomPanel.visibility = View.GONE
             photoRenameBtn.visibility = View.GONE
+            photoDeleteBtn.visibility = View.GONE
+            photoFavBtn.visibility = View.GONE
             uiHandler.removeCallbacks(ascundeFotoCtrls)
         }
         // evidențiază butonul activ
@@ -398,10 +427,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     // ===== Auto-hide controale foto (creion + bară luminozitate/volum), după 3s =====
     private fun afiseazaControaleFoto() {
-        photoControlsBar.alpha = 1f
-        photoControlsBar.visibility = View.VISIBLE
-        photoRenameBtn.alpha = 1f
-        photoRenameBtn.visibility = View.VISIBLE
+        val vizibile = listOf(photoControlsBar, photoRenameBtn, photoDeleteBtn, photoFavBtn)
+        for (v in vizibile) { v.alpha = 1f; v.visibility = View.VISIBLE }
         planificaAscundere()
     }
 
@@ -412,10 +439,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     private fun ascundeControaleFoto() {
         if (modCurent != "photo") return
-        photoControlsBar.animate().alpha(0f).setDuration(250)
-            .withEndAction { if (modCurent == "photo") photoControlsBar.visibility = View.GONE }
-        photoRenameBtn.animate().alpha(0f).setDuration(250)
-            .withEndAction { if (modCurent == "photo") photoRenameBtn.visibility = View.GONE }
+        val ascunde = listOf(photoControlsBar, photoRenameBtn, photoDeleteBtn, photoFavBtn)
+        for (v in ascunde) {
+            v.animate().alpha(0f).setDuration(250)
+                .withEndAction { if (modCurent == "photo") v.visibility = View.GONE }
+        }
     }
 
     private fun actualizeazaMiniaturi() {
@@ -425,6 +453,123 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             afiseazaControaleFoto()
         }
         photoThumbStrip.adapter = thumbAdapter
+    }
+
+    // ===== Ștergere poză =====
+    private fun confirmareStergere() {
+        val pos = imagePager.currentItem
+        if (poze.isEmpty() || pos < 0 || pos >= poze.size) return
+        val nume = numePoza(poze[pos]) ?: "poza"
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Șterge poza?")
+            .setMessage("„$nume” va fi ștearsă definitiv.")
+            .setPositiveButton("Șterge") { _, _ -> stergePoza(pos) }
+            .setNegativeButton("Anulează", null)
+            .show()
+    }
+
+    private fun stergePoza(position: Int) {
+        if (position < 0 || position >= poze.size) return
+        val uri = poze[position]
+        val ok = try {
+            android.provider.DocumentsContract.deleteDocument(contentResolver, uri)
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteDocument eșuat", e)
+            false
+        }
+        if (ok) {
+            poze.removeAt(position)
+            favoritesPoze.remove(uri.toString())
+            salveazaPoze()
+            salveazaFavoritPoze()
+            if (poze.isEmpty()) {
+                imagePager.adapter = null
+                photoAdapter = null
+                actualizeazaMiniaturi()
+                setModVideoGol()
+                tvStatus.text = "Nu mai sunt poze. Adaugă din ⚙️"
+                Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
+            } else {
+                val nouPos = position.coerceIn(0, poze.size - 1)
+                photoAdapter?.notifyItemRemoved(position)
+                photoAdapter?.notifyItemRangeChanged(position, poze.size)
+                incarcaPoze(poze)
+                imagePager.post { imagePager.setCurrentItem(nouPos, false) }
+                actualizeazaMiniaturi()
+                Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Nu am putut șterge poza", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setModVideoGol() {
+        setMod("video")
+    }
+
+    // ===== Favorit poză =====
+    private fun comutaFavorit(position: Int) {
+        if (poze.isEmpty() || position < 0 || position >= poze.size) return
+        val key = poze[position].toString()
+        if (favoritesPoze.contains(key)) {
+            favoritesPoze.remove(key)
+            Toast.makeText(this, "Scos de la favorite ⭐", Toast.LENGTH_SHORT).show()
+        } else {
+            favoritesPoze.add(key)
+            Toast.makeText(this, "Adăugat la favorite ⭐", Toast.LENGTH_SHORT).show()
+        }
+        salveazaFavoritPoze()
+        actualizeazaButonFavorit(position)
+    }
+
+    private fun actualizeazaButonFavorit(position: Int) {
+        if (!::photoFavBtn.isInitialized) return
+        if (poze.isEmpty()) return
+        val key = poze.getOrNull(position)?.toString() ?: ""
+        val esteFavorit = favoritesPoze.contains(key)
+        if (esteFavorit) {
+            photoFavBtn.setImageResource(R.drawable.ic_favorite) // galben/plin
+            photoFavBtn.alpha = 1f
+        } else {
+            photoFavBtn.setImageResource(R.drawable.ic_favorite)
+            photoFavBtn.alpha = 0.45f
+        }
+    }
+
+    private fun incarcaFavoritPoze() {
+        val raw = prefs.getString(KEY_PHOTO_FAV, null) ?: return
+        favoritesPoze.clear()
+        favoritesPoze.addAll(raw.split("\n").filter { it.isNotBlank() })
+    }
+
+    private fun salveazaFavoritPoze() {
+        prefs.edit().putString(KEY_PHOTO_FAV, favoritesPoze.joinToString("\n")).apply()
+    }
+
+    // ===== Salvare/reîncărcare a stării sesiunii (mod + poziție) =====
+    private fun salveazaStareSesiune() {
+        val pos = when {
+            modCurent == "photo" && ::imagePager.isInitialized -> imagePager.currentItem
+            modCurent == "video" && ::viewPager.isInitialized -> viewPager.currentItem
+            else -> 0
+        }
+        prefs.edit()
+            .putString(KEY_LAST_MODE, modCurent)
+            .putInt(KEY_LAST_POS, pos.coerceAtLeast(0))
+            .apply()
+    }
+
+    private fun restaureazaStareSesiune() {
+        val mode = prefs.getString(KEY_LAST_MODE, null) ?: return
+        val pos = prefs.getInt(KEY_LAST_POS, 0)
+        if (mode == "video" && adapter != null) {
+            setMod("video")
+            viewPager.post { viewPager.setCurrentItem(pos.coerceIn(0, (videouri.size - 1).coerceAtLeast(0)), false) }
+        } else if (mode == "photo" && poze.isNotEmpty() && photoAdapter != null) {
+            setMod("photo")
+            imagePager.post { imagePager.setCurrentItem(pos.coerceIn(0, poze.size - 1), false) }
+        }
     }
 
     private fun incarcaLista(lista: List<Uri>) {
@@ -482,6 +627,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
+        salveazaStareSesiune() // nu pierdem poziția/modul la închidere
     }
 
     override fun onStop() {

@@ -70,7 +70,7 @@
             android:layout_marginTop="6dp" />
     </LinearLayout>
 
-    <!-- Creion REDENUMIRE poză: în dreapta, SUB butonul de setări, ca să NU se suprapună.
+    <!-- Creion REDENUMIRE poză: în dreapta, SUB butonul de setări (nu se suprapune).
          Se ascunde automat după 3s în modul Poze. -->
     <ImageButton
         android:id="@+id/photoRenameBtn"
@@ -84,6 +84,36 @@
         android:scaleType="centerInside"
         android:padding="9dp"
         android:contentDescription="Redenumește poza"
+        android:visibility="gone" />
+
+    <!-- Buton ȘTERGERE poză: direct sub creion (144dp), doar în modul Poze, auto-hide 3s -->
+    <ImageButton
+        android:id="@+id/photoDeleteBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="144dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_delete"
+        android:scaleType="centerInside"
+        android:padding="9dp"
+        android:contentDescription="Șterge poza"
+        android:visibility="gone" />
+
+    <!-- Buton FAVORIT poză: direct sub ștergere (200dp), doar în modul Poze, auto-hide 3s -->
+    <ImageButton
+        android:id="@+id/photoFavBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="200dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_favorite"
+        android:scaleType="centerInside"
+        android:padding="9dp"
+        android:contentDescription="Favorit"
         android:visibility="gone" />
 
     <!-- Panoul FOTO (jos, doar modul Poze): controale (luminozitate/volum, auto-hide) + miniaturi -->
