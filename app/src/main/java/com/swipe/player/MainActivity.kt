@@ -179,6 +179,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     /** comută între modul de videoclipuri și galeria de poze (ambele cu swipe vertical) */
     private fun setMod(mod: String) {
         modCurent = mod
+        // dacă ieșim din modul video, oprim redarea (să NU se mai audă videoclipul
+        // în fundal, ex. când privim pozele sau alegem fișiere)
+        if (mod != "video") adapter?.pauseAllPlayers()
         val video = mod == "video"
         viewPager.visibility = if (video && adapter != null) View.VISIBLE else View.GONE
         imagePager.visibility = if (!video && photoAdapter != null) View.VISIBLE else View.GONE
@@ -639,7 +642,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (luminozitateCurenta in 0.3f..1.0f) {
             aplicaLumina(luminozitateCurenta)
         }
-        adapter?.resumeActivePlayer() // la întoarcere doar videoclipul activ pornește
+        // Reia videoclipul activ DOAR dacă suntem în modul video (altfel, după ce alegi
+        // poze / ieși din video, videoclipul NU trebuie să pornească singur în fundal)
+        if (modCurent == "video") adapter?.resumeActivePlayer()
     }
 
     override fun onDestroy() {

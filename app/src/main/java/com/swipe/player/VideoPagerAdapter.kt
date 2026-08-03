@@ -225,7 +225,7 @@ class VideoPagerAdapter(
         var dragStartVal = 0f
         var dragStartPosMs = 0L
         var seekActive = false
-        val dragThreshold = 15f // prag activare gest orizontal (px) pentru seek
+        val dragThreshold = 8f // prag activare gest orizontal (px) pentru seek (mai sensibil)
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
@@ -367,11 +367,16 @@ class VideoPagerAdapter(
                         0 -> {
                             val dx = event.x - h.dragStartX
                             val dy = event.y - h.dragStartY
-                            val orizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+                            val adx = kotlin.math.abs(dx)
+                            val ady = kotlin.math.abs(dy)
+                            // mijloc: tratăm ca SEEK orice mișcare clar orizontală, chiar
+                            // și ușor diagonală (adx >= ady*0.55), ca să pornească ușor.
+                            // Doar mișcările puternic verticale rămân scroll pe ViewPager.
+                            val orizontal = adx >= ady * 0.55f
                             if (h.dragZona == 0) {
                                 // mijloc: orizontal -> seek, vertical -> scroll ViewPager
                                 if (orizontal) {
-                                    if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
+                                    if (adx < h.dragThreshold) return@setOnTouchListener true
                                     h.dragMod = 3 // seek
                                     view.parent?.requestDisallowInterceptTouchEvent(true)
                                     true
