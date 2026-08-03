@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
     private var rezolutieCurenta: Int = 0 // 0=Auto, 720, 1080, 1440 (2K), 2160 (4K)
+    private var seekStepCurent: Int = 10 // secunde de derulare per swipe/buton (2..30)
     private var adapter: VideoPagerAdapter? = null
     private var photoAdapter: ImagePagerAdapter? = null
     private var videouri: MutableList<Uri> = mutableListOf()
@@ -160,6 +161,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             luminozitateCurenta = setari.second
         }
         rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
+        seekStepCurent = MemoryManager.getInstance(this).incarcaSeekStep()
         incarcaFavoritPoze()
         // sincronizează barele foto (luminozitate/volum) cu valorile salvate
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
@@ -584,6 +586,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         )
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
+        nouAdapter.seekStepSec = seekStepCurent // secunde de derulare per swipe/buton
         // aplică rezoluția salvată (Auto / 720p / 1080p)
         val (rw, rh) = rezolutieW(rezolutieCurenta)
         if (rw > 0) nouAdapter.setResolutie(rw, rh)
@@ -662,6 +665,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         try {
             MemoryManager.getInstance(this).salveazaSetari(volumCurent, luminozitateCurenta)
             MemoryManager.getInstance(this).salveazaRezolutie(rezolutieCurenta)
+            MemoryManager.getInstance(this).salveazaSeekStep(seekStepCurent)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
@@ -675,7 +679,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
     private fun deschideSetari() {
         val sheet = SettingsBottomSheetDialogFragment()
-        sheet.setInitial(luminozitateCurenta, volumCurent, rezolutieCurenta)
+        sheet.setInitial(luminozitateCurenta, volumCurent, rezolutieCurenta, seekStepCurent)
         sheet.show(supportFragmentManager, "settings_sheet")
     }
 
@@ -711,6 +715,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         rezolutieCurenta = resolutionH
         val (w, h) = rezolutieW(resolutionH)
         adapter?.setResolutie(w, h)
+        salveazaSetarileCurente()
+    }
+
+    override fun onSeekStepChange(stepSec: Int) {
+        seekStepCurent = stepSec.coerceIn(2, 30)
+        adapter?.seekStepSec = seekStepCurent
         salveazaSetarileCurente()
     }
 
@@ -762,13 +772,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     override fun onReset() {
-        // Reset la valori implicite: luminozitate 100%, volum 100%, rezoluție Auto
+        // Reset la valori implicite: luminozitate 100%, volum 100%, rezoluție Auto, seek 10s
         luminozitateCurenta = 1f
         volumCurent = 1f
         rezolutieCurenta = 0
+        seekStepCurent = 10
         aplicaLumina(1f)
         adapter?.setBrightness(1f)
         adapter?.setVolume(1f)
+        adapter?.seekStepSec = seekStepCurent
         val (w, h) = rezolutieW(0)
         adapter?.setResolutie(w, h)
         salveazaSetarileCurente()

@@ -196,7 +196,8 @@ class VideoPagerAdapter(
         playerActiv?.let { it.volume = currentVolume; it.playWhenReady = true; it.play() }
     }
 
-    private val SEEK_STEP_MS = 10_000L // swipe orizontal = derulare in pas de 10 sec
+    // secunde de derulare per pas/swipe orizontal - ajustabil din Setări (2..30)
+    var seekStepSec = 10
 
     // pagina (poziția) considerată vizibilă/activă - pornește doar ea
     private var activePosition = -1
@@ -208,6 +209,8 @@ class VideoPagerAdapter(
         var player: ExoPlayer? = null
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
+        val btnSeekBack: ImageButton = view.findViewById(R.id.btnSeekBack)
+        val btnSeekFwd: ImageButton = view.findViewById(R.id.btnSeekFwd)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
         val brightnessIndicator: FrameLayout = view.findViewById(R.id.brightnessIndicator)
         val brightnessFill: View = view.findViewById(R.id.brightnessFill)
@@ -423,11 +426,12 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 1, currentVolume)
                             return@setOnTouchListener true
                         }
-                        3 -> { // seek orizontal, pași de 10s
+                        3 -> { // seek orizontal, pași de N secunde (configurabil din Setări)
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
                                 val pas = ((event.x - h.dragStartX) / 15f).toInt()
-                                val target = h.dragStartPosMs + pas * SEEK_STEP_MS
+                                val secMs = seekStepSec.coerceIn(2, 30) * 1000L
+                                val target = h.dragStartPosMs + pas * secMs
                                 player.seekTo(target.coerceIn(0L, durata))
                                 // indicator vizual (bară jos + timp)
                                 showSeekIndicator(h, target.coerceIn(0L, durata), durata)
@@ -456,6 +460,23 @@ class VideoPagerAdapter(
         holder.btnFav.setOnClickListener {
             val ac = memoryManager.toggleFavorite(videoName, (player.duration / 1000).toInt())
             holder.btnFav.setImageResource(if (ac) android.R.drawable.star_on else android.R.drawable.star_off)
+        }
+
+        // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări)
+        val secMs = seekStepSec.coerceIn(2, 30) * 1000L
+        holder.btnSeekBack.visibility = View.VISIBLE
+        holder.btnSeekFwd.visibility = View.VISIBLE
+        holder.btnSeekBack.setOnClickListener {
+            val d = player.duration.coerceAtLeast(0L)
+            val target = (player.currentPosition - secMs).coerceIn(0L, d)
+            player.seekTo(target)
+            if (d > 0) showSeekIndicator(holder, target, d)
+        }
+        holder.btnSeekFwd.setOnClickListener {
+            val d = player.duration.coerceAtLeast(0L)
+            val target = (player.currentPosition + secMs).coerceIn(0L, d)
+            player.seekTo(target)
+            if (d > 0) showSeekIndicator(holder, target, d)
         }
 
     }

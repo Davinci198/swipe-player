@@ -31,6 +31,8 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         fun onVolumeChange(volume: Float)
         /** schimbare rezoluție (Auto=0, 720, 1080) */
         fun onResolutieChange(resolutionH: Int)
+        /** schimbare secunde de derulare per swipe/buton (2..30) */
+        fun onSeekStepChange(stepSec: Int)
         /** șterge doar istoricul de vizionare (nu și fișierele locale) */
         fun onClearHistory()
         /** reset la valori implicite */
@@ -45,11 +47,13 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private var currentBrightness = 1f
     private var currentVolume = 1f
     private var currentResH = 0
+    private var currentSeekStep = 10
 
-    fun setInitial(brightness: Float, volume: Float, resH: Int) {
+    fun setInitial(brightness: Float, volume: Float, resH: Int, seekStep: Int = 10) {
         currentBrightness = brightness.coerceIn(0.15f, 1f)
         currentVolume = volume.coerceIn(0f, 1f)
         currentResH = resH
+        currentSeekStep = seekStep.coerceIn(2, 30)
     }
 
     override fun onAttach(context: Context) {
@@ -147,6 +151,31 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(radio)
 
+        // ---- Derulare (seek): secunde per swipe / buton ⏪⏩ (2..30) ----
+        root.addView(label("Secunde derulare (swipe & ⏪⏩)"))
+        val txtSeekStep = TextView(requireContext()).apply {
+            text = "${currentSeekStep} s"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+        }
+        root.addView(txtSeekStep)
+        val seekStep = SeekBar(requireContext()).apply {
+            max = 28 // 2..30 => indiciu: progress+2
+            progress = currentSeekStep - 2
+            setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    val sec = progress + 2
+                    currentSeekStep = sec
+                    txtSeekStep.text = "$sec s"
+                    listener?.onSeekStepChange(sec)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar) {}
+                override fun onStopTrackingTouch(sb: SeekBar) {}
+            })
+        }
+        root.addView(seekStep)
+
         // ---- Butoane ----
         val btnClear = Button(requireContext()).apply {
             text = "🧹 Șterge bibliotecă + istoric"
@@ -158,7 +187,11 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             text = "Reset"
             setOnClickListener {
                 currentBrightness = 1f; currentVolume = 1f; currentResH = 0
+                currentSeekStep = 10
                 seekLumina.progress = 1000; seekVolum.progress = 1000
+                seekStep.progress = currentSeekStep - 2
+                txtSeekStep.text = "${currentSeekStep} s"
+                listener?.onSeekStepChange(currentSeekStep)
                 listener?.onReset()
                 Toast.makeText(requireContext(), "Setări resetate", Toast.LENGTH_SHORT).show()
             }

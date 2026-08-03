@@ -169,4 +169,31 @@
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@android:drawable/btn_star_big_off" />
+
+    <!-- Butoane de derulare rapidă ⏪/⏩ (pas = N secunde configurat în Setări).
+         Poziționate pe laturi la vertical-mijloc, SUS de zona nume-video/controller,
+         ca să NU se suprapună. Elevation mare (>11dp) ca să prindă click-urile peste
+         touch_catcher (10dp). -->
+    <ImageButton
+        android:id="@+id/btnSeekBack"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="12dp"
+        android:elevation="20dp"
+        android:background="@drawable/seek_btn_bg"
+        android:scaleType="fitCenter"
+        android:contentDescription="Înapoi"
+        android:src="@android:drawable/ic_media_rew" />
+    <ImageButton
+        android:id="@+id/btnSeekFwd"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="12dp"
+        android:elevation="20dp"
+        android:background="@drawable/seek_btn_bg"
+        android:scaleType="fitCenter"
+        android:contentDescription="Înainte"
+        android:src="@android:drawable/ic_media_ff" />
 </FrameLayout>

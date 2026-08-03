@@ -28,6 +28,7 @@ class MemoryManager private constructor(context: Context) {
         private const val KEY_FAVORITES = "favorite"
         private const val KEY_SETTINGS = "setari"
         private const val KEY_RESOLUTIE = "rezolutie"
+        private const val KEY_SEEK_STEP = "seek_step_sec"
         private const val MAX_HISTORY = 200
 
         @Volatile
@@ -275,6 +276,20 @@ class MemoryManager private constructor(context: Context) {
      */
     fun incarcaRezolutie(): Int {
         return prefs.getInt(KEY_RESOLUTIE, 0)
+    }
+
+    /**
+     * Salvează secunde de derulare per swipe/buton (2..30).
+     */
+    fun salveazaSeekStep(secunde: Int) {
+        prefs.edit().putInt(KEY_SEEK_STEP, secunde.coerceIn(2, 30)).apply()
+    }
+
+    /**
+     * Încarcă secunde de derulare salvate (implicit 10).
+     */
+    fun incarcaSeekStep(): Int {
+        return prefs.getInt(KEY_SEEK_STEP, 10).coerceIn(2, 30)
     }
 
     /**
