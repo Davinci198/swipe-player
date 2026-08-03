@@ -472,14 +472,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     private fun stergePoza(position: Int) {
         if (position < 0 || position >= poze.size) return
-        val uri = poze[position]
 
-        // Încercăm ștergerea fizică (SAF / MediaStore). Chiar dacă nu reușim,
-        // scoatem oricum poza din lista aplicației (ca să NU mai apară).
-        val stersFizic = incearcaStergeFisier(uri)
-
+        // SCOATE din lista aplicației, dar NU șterge fișierul fizic de pe dispozitiv
+        // (respectăm cerința: fișierele rămân întotdeauna intacte pe telefon).
+        val scos = poze[position]
         poze.removeAt(position)
-        favoritesPoze.remove(uri.toString())
+        favoritesPoze.remove(scos.toString())
         salveazaPoze()
         salveazaFavoritPoze()
 
@@ -495,34 +493,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             imagePager.post { imagePager.setCurrentItem(nouPos, false) }
             actualizeazaMiniaturi()
         }
-        if (stersFizic) {
-            Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Poza scoasă din aplicație (fișierul nu a putut fi șters)", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    /** Încearcă ștergerea fizică a unui fișier media (SAF document uri sau MediaStore fallback). */
-    private fun incearcaStergeFisier(uri: Uri): Boolean {
-        // 1) Merge pentru uri de tip document (SAF): content://.../documents/document/xxx
-        try {
-            if (uri.scheme == "content" && uri.authority?.contains("documents") == true) {
-                android.provider.DocumentsContract.deleteDocument(contentResolver, uri)
-                return true
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteDocument eșuat: ${e.message}")
-        }
-        // 2) Fallback MediaStore (poze din galeria telefonului)
-        try {
-            if (uri.scheme == "content") {
-                val rows = contentResolver.delete(uri, null, null)
-                if (rows > 0) return true
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "delete MediaStore eșuat: ${e.message}")
-        }
-        return false
+        Toast.makeText(this, "Poza scoasă din aplicație (fișierul rămâne pe telefon)", Toast.LENGTH_SHORT).show()
     }
 
     // ===== Favorit poză =====
