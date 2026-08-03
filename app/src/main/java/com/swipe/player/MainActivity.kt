@@ -1,8 +1,10 @@
 package com.swipe.player
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -63,6 +65,25 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var seekStepCurent: Int = 10 // secunde de derulare per swipe/buton (2..30)
     private var backgroundPlayCurent: Boolean = false // redare în fundal (oprestea sunetului la blocare/iesire)
     private var autoOrderCurent: Boolean = true // autoplay continuu către următorul videoclip
+
+    // Receiver pentru acțiunile din notificarea de redare în fundal (play/pause/stop)
+    private val playbackControlReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, intent: Intent) {
+            when (intent.action) {
+                PlaybackService.ACTION_PLAY ->
+                    if (modCurent == "video") adapter?.resumeActivePlayer()
+                PlaybackService.ACTION_PAUSE -> adapter?.pauseAllPlayers()
+                PlaybackService.ACTION_STOP -> {
+                    adapter?.pauseAllPlayers()
+                    if (backgroundPlayCurent) {
+                        backgroundPlayCurent = false
+                        salveazaSetarileCurente()
+                    }
+                    PlaybackService.stopPlaybackService(this@MainActivity)
+                }
+            }
+        }
+    }
     private var adapter: VideoPagerAdapter? = null
     private var photoAdapter: ImagePagerAdapter? = null
     private var videouri: MutableList<Uri> = mutableListOf()
@@ -74,6 +95,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Ascultăm acțiunile din notificarea de redare în fundal (play/pause/stop)
+        val ff = IntentFilter().apply {
+            addAction(PlaybackService.ACTION_PLAY)
+            addAction(PlaybackService.ACTION_PAUSE)
+            addAction(PlaybackService.ACTION_STOP)
+        }
+        registerReceiver(playbackControlReceiver, ff, ContextCompat.RECEIVER_NOT_EXPORTED)
+
         tvStatus = findViewById(R.id.tvStatus)
         viewPager = findViewById(R.id.viewPager)
         imagePager = findViewById(R.id.imagePager)
@@ -187,7 +217,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         modCurent = mod
         // dacă ieșim din modul video, oprim redarea (să NU se mai audă videoclipul
         // în fundal, ex. când privim pozele sau alegem fișiere)
-        if (mod != "video") adapter?.pauseAllPlayers()
+        if (mod != "video") {
+            adapter?.pauseAllPlayers()
+            PlaybackService.stopPlaybackService(this)
+        }
         val video = mod == "video"
         viewPager.visibility = if (video && adapter != null) View.VISIBLE else View.GONE
         imagePager.visibility = if (!video && photoAdapter != null) View.VISIBLE else View.GONE
@@ -635,10 +668,13 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     override fun onPause() {
         super.onPause()
         // Redare în fundal: dacă e activă și suntem în mod video, lăsăm sunetul să continue
-        // (nu oprim playerul); altfel tăiem sunetul ca de obicei.
+        // (nu oprim playerul + pornim un foreground service care ține procesul prioritar,
+        //  ca sistemul să NU taie sunetul din cauza Doze/WakeLock).
         val continuareFundal = backgroundPlayCurent && modCurent == "video"
         if (!continuareFundal) {
             adapter?.pauseAllPlayers()
+        } else {
+            PlaybackService.startPlaybackService(this, numeVideoclipActiv())
         }
         // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -652,6 +688,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val continuareFundal = backgroundPlayCurent && modCurent == "video"
         if (!continuareFundal) {
             adapter?.pauseAllPlayers() // garanție suplimentară (ex: Home button)
+        } else {
+            PlaybackService.startPlaybackService(this, numeVideoclipActiv())
         }
     }
 
@@ -669,12 +707,17 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // Reia videoclipul activ DOAR dacă suntem în modul video (altfel, după ce alegi
         // poze / ieși din video, videoclipul NU trebuie să pornească singur în fundal)
         if (modCurent == "video") adapter?.resumeActivePlayer()
+        // La revenirea în prim-plan nu mai avem nevoie de foreground service-ul de fundal.
+        PlaybackService.stopPlaybackService(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
+        // altfel rămâne un service orfan + notificare după închiderea aplicației
+        PlaybackService.stopPlaybackService(this)
+        try { unregisterReceiver(playbackControlReceiver) } catch (e: Exception) {}
         // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
         try {
             val lp = window.attributes ?: return
@@ -692,6 +735,16 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
+    }
+
+    /** Numele videoclipului activ (afișat în notificarea de redare în fundal). */
+    private fun numeVideoclipActiv(): String {
+        return try {
+            val poz = viewPager.currentItem
+            if (poz in videouri.indices) {
+                videouri[poz].lastPathSegment?.substringAfterLast("/") ?: "Video"
+            } else "Video"
+        } catch (e: Exception) { "Video" }
     }
 
     // înălțime salvată -> (width, height) maxim pentru decodare; 0=Auto
