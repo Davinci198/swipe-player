@@ -74,7 +74,9 @@ class ZoomableImageView @JvmOverloads constructor(
         if (drawW == 0 || drawH == 0 || width == 0 || height == 0) return
         val vw = width.toFloat()
         val vh = height.toFloat()
-        baseScale = maxOf(vw / drawW, vh / drawH)
+        // fitCenter: încadrează poza COMPLET (fără trunchiere), cu bare negre unde nu umple.
+        // (centerCrop folosea maxOf și tăia părțile care depășeau ecranul)
+        baseScale = minOf(vw / drawW, vh / drawH)
         baseMatrix.reset()
         baseMatrix.postScale(baseScale, baseScale)
         // centrează

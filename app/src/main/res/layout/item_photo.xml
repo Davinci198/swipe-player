@@ -4,12 +4,13 @@
     android:layout_height="match_parent"
     android:background="#FF050507">
 
-    <!-- Poză full-screen, cu ZOOM in/out (pinch) + pan; centerCrop inițial la încărcare -->
+    <!-- Poză full-screen, cu ZOOM in/out (pinch) + pan; se afișează COMPLET (fitCenter),
+         fără trunchiere - barele negre apar doar la proporții diferite de ecran -->
     <com.swipe.player.ZoomableImageView
         android:id="@+id/imgPhoto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         android:contentDescription="Poza" />
 
     <!-- Spinner de încărcare peste poză, ascuns după decode -->
