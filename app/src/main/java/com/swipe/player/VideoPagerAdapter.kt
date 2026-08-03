@@ -203,6 +203,21 @@ class VideoPagerAdapter(
         playerActiv?.let { it.volume = currentVolume; it.playWhenReady = true; it.play() }
     }
 
+    /**
+     * Returnează true dacă oricare dintre playerii activi rulează (playWhenReady).
+     * Folosit pentru pauza/reluarea automată la apel telefonic.
+     */
+    fun isAnyPlayerPlaying(): Boolean {
+        var any = false
+        for (p in allPlayers()) {
+            if (p.playWhenReady && p.duration > 0 && p.currentPosition >= 0) {
+                any = true
+                break
+            }
+        }
+        return any || (playerActiv?.isPlaying == true)
+    }
+
     // secunde de derulare per pas/swipe orizontal - ajustabil din Setări (2..30)
     var seekStepSec = 10
 
@@ -315,6 +330,16 @@ class VideoPagerAdapter(
             object : android.view.GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent): Boolean = true
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    // dacă butoanele de control sunt dezactivate din Setări, nu le mai afișăm;
+                    // doar ascundem orice era vizibil (gesturile swipe rămân active)
+                    if (!controlsVisible) {
+                        holder.playerView.hideController()
+                        holder.itemView.removeCallbacks(hideButtons)
+                        holder.btnSeekBack.visibility = View.GONE
+                        holder.btnSeekFwd.visibility = View.GONE
+                        holder.controllerVisibil = false
+                        return true
+                    }
                     // 1 tap = arată/ascunde controllerul (play/pause) + butoanele de derulare
                     val noul = !holder.controllerVisibil
                     if (noul) {
@@ -690,6 +715,39 @@ class VideoPagerAdapter(
             trackSelector.setParameters(params)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare aplicare rezoluție", e)
+        }
+    }
+
+    // ===== vizibilitatea butoanelor de control (play/pause + ⏪/⏩) =====
+    // Controlat din Setări: true = apar la atingere; false = ascunse complet.
+    private var controlsVisible: Boolean = true
+
+    /**
+     * Activează/dezactivează afișarea butoanelor de control media în modul Video.
+     * Dacă false, controllerul + ⏪/⏩ nu se mai afișează nici la atingere.
+     */
+    fun setControlsVisible(activat: Boolean) {
+        controlsVisible = activat
+        if (!activat) {
+            // ascundem imediat orice controale vizibile în toți holder-ii activi
+            for (h in live.values) {
+                playerHolder[h]?.let { holder ->
+                    holder.btnSeekBack.visibility = View.GONE
+                    holder.btnSeekFwd.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    /** Ascunde toate controllerele media + butoanele ⏪/⏩ în toți holder-ii activi. */
+    fun hideAllControllers() {
+        for (h in live.values) {
+            playerHolder[h]?.let { holder ->
+                holder.playerView.hideController()
+                holder.btnSeekBack.visibility = View.GONE
+                holder.btnSeekFwd.visibility = View.GONE
+                holder.controllerVisibil = false
+            }
         }
     }
 

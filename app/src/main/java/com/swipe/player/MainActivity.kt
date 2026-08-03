@@ -65,6 +65,41 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var seekStepCurent: Int = 10 // secunde de derulare per swipe/buton (2..30)
     private var backgroundPlayCurent: Boolean = false // redare în fundal (oprestea sunetului la blocare/iesire)
     private var autoOrderCurent: Boolean = true // autoplay continuu către următorul videoclip
+    // Vizibilitatea butoanelor de control și a listelor de redare (controlate din Setări)
+    private var ctrlVideoVizibil: Boolean = true  // video: play/pause + ⏪/⏩
+    private var ctrlPhotoVizibil: Boolean = true  // poze: lumină/volum + butoanele
+    private var playlistVizibil: Boolean = true   // liste de redare (miniaturi)
+
+    // Marchează că playerul rulează în momentul în care începe un apel telefonic,
+    // ca să-l reluăm automat după încheierea apelului.
+    private var eraRedareLaApel = false
+
+    // Pauză automată la apel telefonic (RINGING/OFFHOOK) + reluare la IDLE.
+    private val phoneStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, intent: Intent) {
+            try {
+                val state = intent.getStringExtra(android.telephony.TelephonyManager.EXTRA_STATE)
+                when (state) {
+                    android.telephony.TelephonyManager.EXTRA_STATE_RINGING,
+                    android.telephony.TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                        if (modCurent == "video") {
+                            eraRedareLaApel =
+                                adapter?.isAnyPlayerPlaying() ?: false
+                            adapter?.pauseAllPlayers()
+                        }
+                    }
+                    android.telephony.TelephonyManager.EXTRA_STATE_IDLE -> {
+                        if (eraRedareLaApel && modCurent == "video") {
+                            eraRedareLaApel = false
+                            adapter?.resumeActivePlayer()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Eroare receptor stare telefon", e)
+            }
+        }
+    }
 
     // Receiver pentru acțiunile din notificarea de redare în fundal (play/pause/stop)
     private val playbackControlReceiver = object : BroadcastReceiver() {
@@ -103,6 +138,14 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             addAction(PlaybackService.ACTION_STOP)
         }
         registerReceiver(playbackControlReceiver, ff, ContextCompat.RECEIVER_NOT_EXPORTED)
+
+        // Pauză automată la apel telefonic (cu permisiunile READ_PHONE_STATE opționale)
+        try {
+            val ffPhone = IntentFilter(android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+            registerReceiver(phoneStateReceiver, ffPhone)
+        } catch (e: Exception) {
+            Log.w(TAG, "Nu pot înregistra receiver-ul de stare telefonică", e)
+        }
 
         tvStatus = findViewById(R.id.tvStatus)
         viewPager = findViewById(R.id.viewPager)
@@ -196,6 +239,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         seekStepCurent = MemoryManager.getInstance(this).incarcaSeekStep()
         backgroundPlayCurent = MemoryManager.getInstance(this).incarcaBackgroundPlay()
         autoOrderCurent = MemoryManager.getInstance(this).incarcaAutoOrder()
+        ctrlVideoVizibil = MemoryManager.getInstance(this).incarcaCtrlVideoVizibil()
+        ctrlPhotoVizibil = MemoryManager.getInstance(this).incarcaCtrlPhotoVizibil()
+        playlistVizibil = MemoryManager.getInstance(this).incarcaPlaylistVizibil()
         incarcaFavoritPoze()
         // sincronizează barele foto (luminozitate/volum) cu valorile salvate
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
@@ -227,9 +273,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // panoul foto (miniaturi + controale) + creionul — DOAR în modul Poze
         if (!video) {
             photoBottomPanel.visibility = View.VISIBLE
-            photoRenameBtn.visibility = View.VISIBLE
-            photoDeleteBtn.visibility = View.VISIBLE
-            photoFavBtn.visibility = View.VISIBLE
+            photoRenameBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+            photoDeleteBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+            photoFavBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+            // lista de miniaturi (playlist) respectă opțiunea din Setări
+            photoThumbStrip.visibility = if (playlistVizibil) View.VISIBLE else View.GONE
             actualizeazaButonFavorit(imagePager.currentItem)
             afiseazaControaleFoto()
         } else {
@@ -469,6 +517,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     // ===== Auto-hide controale foto (creion + bară luminozitate/volum), după 3s =====
     private fun afiseazaControaleFoto() {
+        // dacă utilizatorul a dezactivat butoanele de control din Setări, nu le mai afișăm
+        if (!ctrlPhotoVizibil) return
         val vizibile = listOf(photoControlsBar, photoRenameBtn, photoDeleteBtn, photoFavBtn)
         for (v in vizibile) { v.alpha = 1f; v.visibility = View.VISIBLE }
         // re-aplicăm corect starea vizuală a butonului de favorit (alpha depinde de stare)
@@ -625,6 +675,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         nouAdapter.currentVolume = volumCurent
         nouAdapter.seekStepSec = seekStepCurent // secunde de derulare per swipe/buton
         nouAdapter.autoOrder = autoOrderCurent // autoplay continuu
+        nouAdapter.setControlsVisible(ctrlVideoVizibil) // vizibilitatea butoanelor de control (Video)
         // la finalul videoclipului : trecem la următorul (doar dacă autoplay e activ, vezi adapter)
         nouAdapter.onItemEnded = {
             val curent = viewPager.currentItem
@@ -718,6 +769,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // altfel rămâne un service orfan + notificare după închiderea aplicației
         PlaybackService.stopPlaybackService(this)
         try { unregisterReceiver(playbackControlReceiver) } catch (e: Exception) {}
+        try { unregisterReceiver(phoneStateReceiver) } catch (e: Exception) {}
         // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
         try {
             val lp = window.attributes ?: return
@@ -732,6 +784,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             MemoryManager.getInstance(this).salveazaSeekStep(seekStepCurent)
             MemoryManager.getInstance(this).salveazaBackgroundPlay(backgroundPlayCurent)
             MemoryManager.getInstance(this).salveazaAutoOrder(autoOrderCurent)
+            MemoryManager.getInstance(this).salveazaCtrlVideoVizibil(ctrlVideoVizibil)
+            MemoryManager.getInstance(this).salveazaCtrlPhotoVizibil(ctrlPhotoVizibil)
+            MemoryManager.getInstance(this).salveazaPlaylistVizibil(playlistVizibil)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
@@ -761,7 +816,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             resH = rezolutieCurenta,
             seekStep = seekStepCurent,
             backgroundPlay = backgroundPlayCurent,
-            autoOrder = autoOrderCurent
+            autoOrder = autoOrderCurent,
+            ctrlVideo = ctrlVideoVizibil,
+            ctrlPhoto = ctrlPhotoVizibil,
+            playlist = playlistVizibil
         )
         sheet.show(supportFragmentManager, "settings_sheet")
     }
@@ -817,6 +875,33 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     override fun onAutoOrderChange(activat: Boolean) {
         autoOrderCurent = activat
         adapter?.autoOrder = activat
+        salveazaSetarileCurente()
+    }
+
+    override fun onCtrlVideoChange(activat: Boolean) {
+        ctrlVideoVizibil = activat
+        adapter?.setControlsVisible(activat)
+        // dacă ascundem butoanele, ascundem imediat controllerul media + ⏪/⏩
+        if (!activat) adapter?.hideAllControllers()
+        salveazaSetarileCurente()
+    }
+
+    override fun onCtrlPhotoChange(activat: Boolean) {
+        ctrlPhotoVizibil = activat
+        if (!activat) {
+            // ascundem complet controalele foto (luminozitate/volum + butoanele rename/delete/fav)
+            ascundeControaleFoto()
+            photoControlsBar.visibility = View.GONE
+            photoRenameBtn.visibility = View.GONE
+            photoDeleteBtn.visibility = View.GONE
+            photoFavBtn.visibility = View.GONE
+        }
+        salveazaSetarileCurente()
+    }
+
+    override fun onPlaylistChange(activat: Boolean) {
+        playlistVizibil = activat
+        photoThumbStrip.visibility = if (activat) View.VISIBLE else View.GONE
         salveazaSetarileCurente()
     }
 
@@ -882,6 +967,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         backgroundPlayCurent = false
         autoOrderCurent = true
         adapter?.autoOrder = autoOrderCurent
+        // reset la vizibilități implicite (totul vizibil)
+        ctrlVideoVizibil = true
+        ctrlPhotoVizibil = true
+        playlistVizibil = true
+        adapter?.setControlsVisible(true)
+        photoThumbStrip.visibility = View.VISIBLE
         salveazaSetarileCurente()
     }
 }

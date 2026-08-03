@@ -12,6 +12,8 @@
          Setări > Permite modificarea setărilor de sistem. tools:ignore suprima avertismentul. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Pauză automată la apel telefonic (stare RINGING/OFFHOOK/IDLE) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <application
         android:allowBackup="true"
         android:label="Swipe Player"

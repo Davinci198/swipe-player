@@ -46,6 +46,12 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         fun onChooseVideos()
         /** alege poze din telefon (din setări) */
         fun onChoosePhotos()
+        /** vizibilitatea butoanelor de control în modul VIDEO */
+        fun onCtrlVideoChange(activat: Boolean)
+        /** vizibilitatea butoanelor de control în modul POZE */
+        fun onCtrlPhotoChange(activat: Boolean)
+        /** vizibilitatea listelor de redare (miniaturi) */
+        fun onPlaylistChange(activat: Boolean)
     }
 
     private var listener: Listener? = null
@@ -55,6 +61,9 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private var currentSeekStep = 10
     private var currentBackgroundPlay = false
     private var currentAutoOrder = true
+    private var currentCtrlVideo = true
+    private var currentCtrlPhoto = true
+    private var currentPlaylist = true
 
     fun setInitial(
         brightness: Float,
@@ -62,7 +71,10 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         resH: Int,
         seekStep: Int = 10,
         backgroundPlay: Boolean = false,
-        autoOrder: Boolean = true
+        autoOrder: Boolean = true,
+        ctrlVideo: Boolean = true,
+        ctrlPhoto: Boolean = true,
+        playlist: Boolean = true
     ) {
         currentBrightness = brightness.coerceIn(0.15f, 1f)
         currentVolume = volume.coerceIn(0f, 1f)
@@ -70,6 +82,9 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         currentSeekStep = seekStep.coerceIn(2, 30)
         currentBackgroundPlay = backgroundPlay
         currentAutoOrder = autoOrder
+        currentCtrlVideo = ctrlVideo
+        currentCtrlPhoto = ctrlPhoto
+        currentPlaylist = playlist
     }
 
     override fun onAttach(context: Context) {
@@ -125,6 +140,30 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         ) { activat -> listener?.onAutoOrderChange(activat) }
         val swAuto = rowAuto.switch
         root.addView(rowAuto.view)
+
+        // ---- Vizibilitate butoane & liste (separat pe video/poze) ----
+        root.addView(label("Vizibilitate butoane & liste"))
+        val rowCtrlVideo = switchRow(
+            title = "Video: butoane de control",
+            desc = "Afișează play/pause și derulare ⏪/⏩ la atingere, în modul Video.",
+            initial = currentCtrlVideo
+        ) { activat -> listener?.onCtrlVideoChange(activat) }
+        val swCtrlVideo = rowCtrlVideo.switch
+        root.addView(rowCtrlVideo.view)
+        val rowCtrlPhoto = switchRow(
+            title = "Poze: butoane de control",
+            desc = "Afișează barele de luminozitate/volum și butoanele (redenumire/ștergere/favorit).",
+            initial = currentCtrlPhoto
+        ) { activat -> listener?.onCtrlPhotoChange(activat) }
+        val swCtrlPhoto = rowCtrlPhoto.switch
+        root.addView(rowCtrlPhoto.view)
+        val rowPlaylist = switchRow(
+            title = "Liste de redare (miniaturi)",
+            desc = "Afișează lista de navigare rapidă cu miniaturile videoclipurilor/pozelor.",
+            initial = currentPlaylist
+        ) { activat -> listener?.onPlaylistChange(activat) }
+        val swPlaylist = rowPlaylist.switch
+        root.addView(rowPlaylist.view)
 
         // ---- Luminozitate (aplicată live, native de sistem) ----
         root.addView(label("Luminozitate (live)"))
@@ -209,6 +248,24 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(seekStep)
 
+        // ---- Statistici de vizionare ----
+        root.addView(label("Statistici"))
+        run {
+            val st = MemoryManager.getInstance(requireContext()).getStatistici()
+            val difTotal = st["timpTotalSecunde"] as? Int ?: 0
+            root.addView(TextView(requireContext()).apply {
+                text = """
+                    📹 Vizionări totale: ${st["totalVizionari"]}
+                    🎞️ Videoclipuri unice: ${st["videouriUnice"]}
+                    ⭐ Favorite: ${st["totalFavorite"]}
+                    ⏱️ Timp total vizionat: ${MemoryManager.getInstance(requireContext()).formateazaDurata(difTotal)}
+                """.trimIndent()
+                textSize = 14f
+                setTextColor(Color.LTGRAY)
+                setPadding(0, 8, 0, 8)
+            })
+        }
+
         // ---- Butoane ----
         val btnClear = Button(requireContext()).apply {
             text = "🧹 Șterge bibliotecă + istoric"
@@ -223,14 +280,23 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 currentSeekStep = 10
                 currentBackgroundPlay = false
                 currentAutoOrder = true
+                currentCtrlVideo = true
+                currentCtrlPhoto = true
+                currentPlaylist = true
                 seekLumina.progress = 1000; seekVolum.progress = 1000
                 seekStep.progress = currentSeekStep - 2
                 txtSeekStep.text = "${currentSeekStep} s"
                 swBackground.isChecked = false
                 swAuto.isChecked = true
+                swCtrlVideo.isChecked = true
+                swCtrlPhoto.isChecked = true
+                swPlaylist.isChecked = true
                 listener?.onSeekStepChange(currentSeekStep)
                 listener?.onBackgroundPlayChange(false)
                 listener?.onAutoOrderChange(true)
+                listener?.onCtrlVideoChange(true)
+                listener?.onCtrlPhotoChange(true)
+                listener?.onPlaylistChange(true)
                 listener?.onReset()
                 Toast.makeText(requireContext(), "Setări resetate", Toast.LENGTH_SHORT).show()
             }

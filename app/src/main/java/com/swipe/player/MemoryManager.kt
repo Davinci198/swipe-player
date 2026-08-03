@@ -31,6 +31,9 @@ class MemoryManager private constructor(context: Context) {
         private const val KEY_SEEK_STEP = "seek_step_sec"
         private const val KEY_BG_PLAY = "background_play"
         private const val KEY_AUTO_ORDER = "auto_order_play"
+        private const val KEY_CTRL_VIDEO = "ctrl_video_visible"
+        private const val KEY_CTRL_PHOTO = "ctrl_photo_visible"
+        private const val KEY_PLAYLIST_VISIBLE = "playlist_visible"
         private const val MAX_HISTORY = 200
 
         @Volatile
@@ -316,6 +319,45 @@ class MemoryManager private constructor(context: Context) {
 
     fun incarcaAutoOrder(): Boolean {
         return prefs.getBoolean(KEY_AUTO_ORDER, true) // implicit: continuăm automat (standard)
+    }
+
+    /**
+     * Vizibilitatea butoanelor de control în modul VIDEO (play/pause, ⏪/⏩).
+     * true = butoanele apar (la atingere); false = butoanele sunt ascunse complet.
+     */
+    fun salveazaCtrlVideoVizibil(activat: Boolean) {
+        prefs.edit().putBoolean(KEY_CTRL_VIDEO, activat).apply()
+        Log.d(TAG, "CtrlVideoVizibil=$activat")
+    }
+
+    fun incarcaCtrlVideoVizibil(): Boolean {
+        return prefs.getBoolean(KEY_CTRL_VIDEO, true) // implicit: vizibile (comportament clasic)
+    }
+
+    /**
+     * Vizibilitatea controalelor în modul POZE (lumină/volum + butoane rename/delete/fav).
+     * true = controalele apar (la atingere); false = contralonele sunt ascunse complet.
+     */
+    fun salveazaCtrlPhotoVizibil(activat: Boolean) {
+        prefs.edit().putBoolean(KEY_CTRL_PHOTO, activat).apply()
+        Log.d(TAG, "CtrlPhotoVizibil=$activat")
+    }
+
+    fun incarcaCtrlPhotoVizibil(): Boolean {
+        return prefs.getBoolean(KEY_CTRL_PHOTO, true) // implicit: vizibile
+    }
+
+    /**
+     * Vizibilitatea listelor de redare (rândul de miniaturi de navigare rapidă).
+     * true = listele se afișează; false = listele sunt ascunse complet.
+     */
+    fun salveazaPlaylistVizibil(activat: Boolean) {
+        prefs.edit().putBoolean(KEY_PLAYLIST_VISIBLE, activat).apply()
+        Log.d(TAG, "PlaylistVizibil=$activat")
+    }
+
+    fun incarcaPlaylistVizibil(): Boolean {
+        return prefs.getBoolean(KEY_PLAYLIST_VISIBLE, true) // implicit: vizibile
     }
 
     /**
