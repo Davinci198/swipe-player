@@ -149,7 +149,7 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
         // ---- Butoane ----
         val btnClear = Button(requireContext()).apply {
-            text = "Șterge istoric vizionare"
+            text = "🧹 Șterge bibliotecă + istoric"
             setOnClickListener { listener?.onClearHistory() }
         }
         root.addView(btnClear)

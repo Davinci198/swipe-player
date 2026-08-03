@@ -429,6 +429,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private fun afiseazaControaleFoto() {
         val vizibile = listOf(photoControlsBar, photoRenameBtn, photoDeleteBtn, photoFavBtn)
         for (v in vizibile) { v.alpha = 1f; v.visibility = View.VISIBLE }
+        // re-aplicăm corect starea vizuală a butonului de favorit (alpha depinde de stare)
+        actualizeazaButonFavorit(imagePager.currentItem)
         planificaAscundere()
     }
 
@@ -471,41 +473,56 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private fun stergePoza(position: Int) {
         if (position < 0 || position >= poze.size) return
         val uri = poze[position]
-        val ok = try {
-            android.provider.DocumentsContract.deleteDocument(contentResolver, uri)
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "deleteDocument eșuat", e)
-            false
-        }
-        if (ok) {
-            poze.removeAt(position)
-            favoritesPoze.remove(uri.toString())
-            salveazaPoze()
-            salveazaFavoritPoze()
-            if (poze.isEmpty()) {
-                imagePager.adapter = null
-                photoAdapter = null
-                actualizeazaMiniaturi()
-                setModVideoGol()
-                tvStatus.text = "Nu mai sunt poze. Adaugă din ⚙️"
-                Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
-            } else {
-                val nouPos = position.coerceIn(0, poze.size - 1)
-                photoAdapter?.notifyItemRemoved(position)
-                photoAdapter?.notifyItemRangeChanged(position, poze.size)
-                incarcaPoze(poze)
-                imagePager.post { imagePager.setCurrentItem(nouPos, false) }
-                actualizeazaMiniaturi()
-                Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
-            }
+
+        // Încercăm ștergerea fizică (SAF / MediaStore). Chiar dacă nu reușim,
+        // scoatem oricum poza din lista aplicației (ca să NU mai apară).
+        val stersFizic = incearcaStergeFisier(uri)
+
+        poze.removeAt(position)
+        favoritesPoze.remove(uri.toString())
+        salveazaPoze()
+        salveazaFavoritPoze()
+
+        if (poze.isEmpty()) {
+            imagePager.adapter = null
+            photoAdapter = null
+            actualizeazaMiniaturi()
+            setMod("video")
+            tvStatus.text = "Nu mai sunt poze. Adaugă din ⚙️"
         } else {
-            Toast.makeText(this, "Nu am putut șterge poza", Toast.LENGTH_SHORT).show()
+            val nouPos = position.coerceIn(0, poze.size - 1)
+            incarcaPoze(poze)
+            imagePager.post { imagePager.setCurrentItem(nouPos, false) }
+            actualizeazaMiniaturi()
+        }
+        if (stersFizic) {
+            Toast.makeText(this, "Poza ștearsă", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Poza scoasă din aplicație (fișierul nu a putut fi șters)", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun setModVideoGol() {
-        setMod("video")
+    /** Încearcă ștergerea fizică a unui fișier media (SAF document uri sau MediaStore fallback). */
+    private fun incearcaStergeFisier(uri: Uri): Boolean {
+        // 1) Merge pentru uri de tip document (SAF): content://.../documents/document/xxx
+        try {
+            if (uri.scheme == "content" && uri.authority?.contains("documents") == true) {
+                android.provider.DocumentsContract.deleteDocument(contentResolver, uri)
+                return true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteDocument eșuat: ${e.message}")
+        }
+        // 2) Fallback MediaStore (poze din galeria telefonului)
+        try {
+            if (uri.scheme == "content") {
+                val rows = contentResolver.delete(uri, null, null)
+                if (rows > 0) return true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "delete MediaStore eșuat: ${e.message}")
+        }
+        return false
     }
 
     // ===== Favorit poză =====
@@ -564,11 +581,16 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val mode = prefs.getString(KEY_LAST_MODE, null) ?: return
         val pos = prefs.getInt(KEY_LAST_POS, 0)
         if (mode == "video" && adapter != null) {
+            val p = pos.coerceIn(0, (videouri.size - 1).coerceAtLeast(0))
             setMod("video")
-            viewPager.post { viewPager.setCurrentItem(pos.coerceIn(0, (videouri.size - 1).coerceAtLeast(0)), false) }
+            viewPager.post {
+                viewPager.setCurrentItem(p, false)
+                adapter?.setActivePage(p) // pornește playerul de pe pagina restabilită
+            }
         } else if (mode == "photo" && poze.isNotEmpty() && photoAdapter != null) {
+            val p = pos.coerceIn(0, poze.size - 1)
             setMod("photo")
-            imagePager.post { imagePager.setCurrentItem(pos.coerceIn(0, poze.size - 1), false) }
+            imagePager.post { imagePager.setCurrentItem(p, false) }
         }
     }
 
@@ -717,9 +739,43 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     override fun onClearHistory() {
-        // șterge doar istoricul de vizionare, NU fișierele locale
-        MemoryManager.getInstance(this).stergeTotIstoricul()
-        Toast.makeText(this, "Istoric vizionare șters", Toast.LENGTH_SHORT).show()
+        // Șterge biblioteca + istoricul (videoclipuri & poze din aplicație, progress, favorite).
+        // Nu șterge fișierele de pe telefon, doar le scoate din lista aplicației.
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Șterge biblioteca?")
+            .setMessage(
+                "Videoclipurile și pozele adăugate, progresul de vizionare, \n" +
+                "favoritele și poziția curentă vor fi șterse din aplicație. \n\n" +
+                "Fișierele rămân pe telefon."
+            )
+            .setPositiveButton("Șterge") { _, _ ->
+                // 1. istoric vizionare (progress)
+                MemoryManager.getInstance(this).stergeTotIstoricul()
+                // 2. listele salvate din preferințe
+                prefs.edit()
+                    .remove(KEY_URIS)
+                    .remove(KEY_PHOTO_URIS)
+                    .remove(KEY_PHOTO_FAV)
+                    .remove(KEY_LAST_MODE)
+                    .remove(KEY_LAST_POS)
+                    .apply()
+                favoritesPoze.clear()
+                // 3. curăță și memoria + pager-urile
+                videouri.clear()
+                poze.clear()
+                viewPager.adapter = null
+                imagePager.adapter = null
+                adapter = null
+                photoAdapter = null
+                actualizeazaMiniaturi()
+                viewPager.setCurrentItem(0, false)
+                imagePager.setCurrentItem(0, false)
+                tvStatus.text = "Bibliotecă golită. Alege fișiere din ⚙️"
+                setMod("video")
+                Toast.makeText(this, "Bibliotecă + istoric șterse", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Anulează", null)
+            .show()
     }
 
     override fun onChooseVideos() {

@@ -60,8 +60,8 @@ class ThumbnailAdapter(
     }
 
     private fun decodeThumb(uri: Uri): Bitmap? {
-        val target = context.resources.getDimensionPixelSize(
-            android.R.dimen.notification_large_icon_height)
+        // dimensiune țintă fixă (evită riscul ca notification_large_icon_height să lipsească)
+        val target = (context.resources.displayMetrics.density * 96).toInt()
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         try {
             context.contentResolver.openInputStream(uri)?.use {

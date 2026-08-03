@@ -86,6 +86,7 @@ class VideoPagerAdapter(
     // ===== Pinch ZOOM pe video (experimental, aditiv; nu atinge gesturile cu un deget) =====
     private var pinchPlayerView: PlayerView? = null
     private var videoZoom = 1f
+    private var pinchActive = false // rămâne adevărat până scapi ultimul deget
 
     private val pinchListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -305,10 +306,17 @@ class VideoPagerAdapter(
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
         h.touchCatcher.setOnTouchListener { view, event ->
-            // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating)
-            if (event.pointerCount > 1) {
+            // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating).
+            // Chiar și după ce ridici un deget (pointerCount=1) rămânem în modul pinch până
+            // la ACTION_UP, ca să NU se combine cu luminozitatea/volumul (bug „zip" final).
+            if (event.pointerCount > 1) pinchActive = true
+            if (event.pointerCount > 1 || pinchActive) {
                 pinchPlayerView = holder.playerView
                 pinchDetector.onTouchEvent(event)
+                if (event.actionMasked == MotionEvent.ACTION_UP ||
+                    event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    pinchActive = false
+                }
                 return@setOnTouchListener true
             }
             // GestureDetector pentru tap/dublu-tap (play/pause/controller)
