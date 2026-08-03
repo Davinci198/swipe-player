@@ -212,6 +212,9 @@ class VideoPagerAdapter(
     // callback apelat când videoclipul activ ajunge la final (folosit pentru autoplay)
     var onItemEnded: (() -> Unit)? = null
 
+    // timpul cât rămân vizibile controllerul + butoanele de derulare după o atingere
+    private val CTRL_TIMEOUT_MS = 2500L
+
     // pagina (poziția) considerată vizibilă/activă - pornește doar ea
     private var activePosition = -1
 
@@ -261,7 +264,7 @@ class VideoPagerAdapter(
         holder.player = player
         live[position] = player
         holder.playerView.player = player
-        holder.playerView.setControllerShowTimeoutMs(2000) // controllerul dispare mai repede
+        holder.playerView.setControllerShowTimeoutMs(CTRL_TIMEOUT_MS.toInt()) // sincron cu butoanele
         resetVideoZoom(holder.playerView) // fără zoom rămas din holder-ul reciclat
         // aplică starea de luminozitate pe paginile nou afișate (fallback dim vizibil)
         aplicaDim(holder, currentBrightness)
@@ -293,6 +296,16 @@ class VideoPagerAdapter(
             playerActiv = player
         }
 
+        // Ascunde butoanele ⏪/⏩ automat, când controllerul dispare după timeout
+        // (nu le ținem mereu pe ecran; apar doar cu controllerul la atingere).
+        val hideButtons = Runnable {
+            if (holder.controllerVisibil) {
+                holder.btnSeekBack.visibility = View.GONE
+                holder.btnSeekFwd.visibility = View.GONE
+                holder.dragMod = 0
+            }
+        }
+
         // ===== Gesture State Machine =====
         // Un singur GestureDetector (taps) + un singur OnTouchListener (drag-uri).
         // Stări dragMod: 0=none, 2=luminozitate(stânga), 1=volum(dreapta),
@@ -302,10 +315,22 @@ class VideoPagerAdapter(
             object : android.view.GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent): Boolean = true
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                    // 1 tap = arată/ascunde controllerul (play/pause)
-                    if (holder.controllerVisibil) holder.playerView.hideController()
-                    else holder.playerView.showController()
-                    holder.controllerVisibil = !holder.controllerVisibil
+                    // 1 tap = arată/ascunde controllerul (play/pause) + butoanele de derulare
+                    val noul = !holder.controllerVisibil
+                    if (noul) {
+                        holder.playerView.showController()
+                        holder.btnSeekBack.visibility = View.VISIBLE
+                        holder.btnSeekFwd.visibility = View.VISIBLE
+                        // butoanele dispar automat împreună cu controllerul (după timeout)
+                        holder.itemView.removeCallbacks(hideButtons)
+                        holder.itemView.postDelayed(hideButtons, CTRL_TIMEOUT_MS)
+                    } else {
+                        holder.playerView.hideController()
+                        holder.itemView.removeCallbacks(hideButtons)
+                        holder.btnSeekBack.visibility = View.GONE
+                        holder.btnSeekFwd.visibility = View.GONE
+                    }
+                    holder.controllerVisibil = noul
                     return true
                 }
                 override fun onDoubleTap(e: MotionEvent): Boolean {
@@ -475,10 +500,11 @@ class VideoPagerAdapter(
             holder.btnFav.setImageResource(if (ac) android.R.drawable.star_on else android.R.drawable.star_off)
         }
 
-        // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări)
+        // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări).
+        // Implicit ASCUNSE; apar doar împreună cu controllerul media (la atingere).
         val secMs = seekStepSec.coerceIn(2, 30) * 1000L
-        holder.btnSeekBack.visibility = View.VISIBLE
-        holder.btnSeekFwd.visibility = View.VISIBLE
+        holder.btnSeekBack.visibility = View.GONE
+        holder.btnSeekFwd.visibility = View.GONE
         holder.btnSeekBack.setOnClickListener {
             val d = player.duration.coerceAtLeast(0L)
             val target = (player.currentPosition - secMs).coerceIn(0L, d)
