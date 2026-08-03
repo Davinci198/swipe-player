@@ -29,6 +29,8 @@ class MemoryManager private constructor(context: Context) {
         private const val KEY_SETTINGS = "setari"
         private const val KEY_RESOLUTIE = "rezolutie"
         private const val KEY_SEEK_STEP = "seek_step_sec"
+        private const val KEY_BG_PLAY = "background_play"
+        private const val KEY_AUTO_ORDER = "auto_order_play"
         private const val MAX_HISTORY = 200
 
         @Volatile
@@ -290,6 +292,30 @@ class MemoryManager private constructor(context: Context) {
      */
     fun incarcaSeekStep(): Int {
         return prefs.getInt(KEY_SEEK_STEP, 10).coerceIn(2, 30)
+    }
+
+    /**
+     * Redare în fundal (continuă sunetul când ecranul se blochează / ieși din app).
+     */
+    fun salveazaBackgroundPlay(activat: Boolean) {
+        prefs.edit().putBoolean(KEY_BG_PLAY, activat).apply()
+        Log.d(TAG, "BackgroundPlay=$activat")
+    }
+
+    fun incarcaBackgroundPlay(): Boolean {
+        return prefs.getBoolean(KEY_BG_PLAY, false)
+    }
+
+    /**
+     * Autoplay în ordine: trece automat la videoclipul următor când se termină.
+     */
+    fun salveazaAutoOrder(activat: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_ORDER, activat).apply()
+        Log.d(TAG, "AutoOrder=$activat")
+    }
+
+    fun incarcaAutoOrder(): Boolean {
+        return prefs.getBoolean(KEY_AUTO_ORDER, true) // implicit: continuăm automat (standard)
     }
 
     /**

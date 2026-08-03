@@ -61,6 +61,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var luminozitateCurenta: Float = 1f
     private var rezolutieCurenta: Int = 0 // 0=Auto, 720, 1080, 1440 (2K), 2160 (4K)
     private var seekStepCurent: Int = 10 // secunde de derulare per swipe/buton (2..30)
+    private var backgroundPlayCurent: Boolean = false // redare în fundal (oprestea sunetului la blocare/iesire)
+    private var autoOrderCurent: Boolean = true // autoplay continuu către următorul videoclip
     private var adapter: VideoPagerAdapter? = null
     private var photoAdapter: ImagePagerAdapter? = null
     private var videouri: MutableList<Uri> = mutableListOf()
@@ -162,6 +164,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
         rezolutieCurenta = MemoryManager.getInstance(this).incarcaRezolutie()
         seekStepCurent = MemoryManager.getInstance(this).incarcaSeekStep()
+        backgroundPlayCurent = MemoryManager.getInstance(this).incarcaBackgroundPlay()
+        autoOrderCurent = MemoryManager.getInstance(this).incarcaAutoOrder()
         incarcaFavoritPoze()
         // sincronizează barele foto (luminozitate/volum) cu valorile salvate
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
@@ -587,6 +591,14 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
         nouAdapter.seekStepSec = seekStepCurent // secunde de derulare per swipe/buton
+        nouAdapter.autoOrder = autoOrderCurent // autoplay continuu
+        // la finalul videoclipului : trecem la următorul (doar dacă autoplay e activ, vezi adapter)
+        nouAdapter.onItemEnded = {
+            val curent = viewPager.currentItem
+            if (curent < videouri.size - 1) {
+                viewPager.post { viewPager.setCurrentItem(curent + 1, true) }
+            }
+        }
         // aplică rezoluția salvată (Auto / 720p / 1080p)
         val (rw, rh) = rezolutieW(rezolutieCurenta)
         if (rw > 0) nouAdapter.setResolutie(rw, rh)
@@ -622,7 +634,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onPause() {
         super.onPause()
-        adapter?.pauseAllPlayers() // oprește audio când app merge în fundal
+        // Redare în fundal: dacă e activă și suntem în mod video, lăsăm sunetul să continue
+        // (nu oprim playerul); altfel tăiem sunetul ca de obicei.
+        val continuareFundal = backgroundPlayCurent && modCurent == "video"
+        if (!continuareFundal) {
+            adapter?.pauseAllPlayers()
+        }
         // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
@@ -631,7 +648,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onStop() {
         super.onStop()
-        adapter?.pauseAllPlayers() // garanție suplimentară (ex: Home button)
+        // Redare în fundal: la Home/minimize păstrăm sunetul dacă opțiunea e activă (mod video)
+        val continuareFundal = backgroundPlayCurent && modCurent == "video"
+        if (!continuareFundal) {
+            adapter?.pauseAllPlayers() // garanție suplimentară (ex: Home button)
+        }
     }
 
     override fun onResume() {
@@ -666,6 +687,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             MemoryManager.getInstance(this).salveazaSetari(volumCurent, luminozitateCurenta)
             MemoryManager.getInstance(this).salveazaRezolutie(rezolutieCurenta)
             MemoryManager.getInstance(this).salveazaSeekStep(seekStepCurent)
+            MemoryManager.getInstance(this).salveazaBackgroundPlay(backgroundPlayCurent)
+            MemoryManager.getInstance(this).salveazaAutoOrder(autoOrderCurent)
         } catch (e: Exception) {
             Log.e(TAG, "Eroare salvare setări", e)
         }
@@ -679,7 +702,14 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
     private fun deschideSetari() {
         val sheet = SettingsBottomSheetDialogFragment()
-        sheet.setInitial(luminozitateCurenta, volumCurent, rezolutieCurenta, seekStepCurent)
+        sheet.setInitial(
+            brightness = luminozitateCurenta,
+            volume = volumCurent,
+            resH = rezolutieCurenta,
+            seekStep = seekStepCurent,
+            backgroundPlay = backgroundPlayCurent,
+            autoOrder = autoOrderCurent
+        )
         sheet.show(supportFragmentManager, "settings_sheet")
     }
 
@@ -721,6 +751,19 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     override fun onSeekStepChange(stepSec: Int) {
         seekStepCurent = stepSec.coerceIn(2, 30)
         adapter?.seekStepSec = seekStepCurent
+        salveazaSetarileCurente()
+    }
+
+    override fun onBackgroundPlayChange(activat: Boolean) {
+        backgroundPlayCurent = activat
+        salveazaSetarileCurente()
+        // dacă dezactivăm din mers și sună ceva în fundal, îl oprim imediat
+        if (!activat) adapter?.pauseAllPlayers()
+    }
+
+    override fun onAutoOrderChange(activat: Boolean) {
+        autoOrderCurent = activat
+        adapter?.autoOrder = activat
         salveazaSetarileCurente()
     }
 
@@ -783,6 +826,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         adapter?.seekStepSec = seekStepCurent
         val (w, h) = rezolutieW(0)
         adapter?.setResolutie(w, h)
+        backgroundPlayCurent = false
+        autoOrderCurent = true
+        adapter?.autoOrder = autoOrderCurent
         salveazaSetarileCurente()
     }
 }

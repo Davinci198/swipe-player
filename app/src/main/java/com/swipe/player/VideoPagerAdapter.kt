@@ -149,7 +149,14 @@ class VideoPagerAdapter(
             when (playbackState) {
                 Player.STATE_BUFFERING -> holder.loadingContainer.visibility = View.VISIBLE
                 Player.STATE_READY -> holder.loadingContainer.visibility = View.GONE
-                Player.STATE_ENDED -> salveazaProgres(numePentru(p), p, 100)
+                Player.STATE_ENDED -> {
+                    salveazaProgres(numePentru(p), p, 100)
+                    // autoplay: dacă e activ și videoclipul care s-a terminat e cel vizibil,
+                    // saltul la următorul se face din MainActivity (callback)
+                    if (autoOrder && pozitiePentru(p) == activePosition) {
+                        onItemEnded?.invoke()
+                    }
+                }
             }
         }
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -198,6 +205,12 @@ class VideoPagerAdapter(
 
     // secunde de derulare per pas/swipe orizontal - ajustabil din Setări (2..30)
     var seekStepSec = 10
+
+    // autoplay în ordine: când un videoclip se termină, trece automat la următorul
+    var autoOrder = true
+
+    // callback apelat când videoclipul activ ajunge la final (folosit pentru autoplay)
+    var onItemEnded: (() -> Unit)? = null
 
     // pagina (poziția) considerată vizibilă/activă - pornește doar ea
     private var activePosition = -1
