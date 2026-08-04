@@ -208,6 +208,34 @@ class VideoPagerAdapter(
         if (pool.size < MAX_POOL) pool.addLast(p) else p.release()
     }
 
+    /**
+     * Eliberează defintiv TOȚI ExoPlayerii (folosiți + din pool). Apelat la închiderea
+     * completă a aplicației, ca să NU rămână playere legate de o Activitate distrusă
+     * (evită crash-uri pe thread-ul media la reinstanțiere).
+     */
+    fun elibereazaTot() {
+        try {
+            val toti = LinkedHashSet<ExoPlayer>().apply { addAll(live.values); addAll(pool) }
+            for (p in toti) {
+                try {
+                    p.volume = 0f
+                    p.playWhenReady = false
+                    p.pause()
+                    p.stop()
+                    p.clearMediaItems()
+                    p.release()
+                } catch (e: Exception) { /* player deja eliberat */ }
+            }
+            live.clear()
+            pool.clear()
+            playerHolder.clear()
+            playerActiv = null
+            playerHolder.clear()
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare eliberare playere", e)
+        }
+    }
+
     /** Toți ExoPlayerii aflați în uz sau în pool (pentru pause/resume global) */
     private fun allPlayers(): Collection<ExoPlayer> =
         LinkedHashSet<ExoPlayer>().apply { addAll(live.values); addAll(pool) }
@@ -218,9 +246,11 @@ class VideoPagerAdapter(
      */
     fun pauseAllPlayers() {
         for (p in allPlayers()) {
-            p.playWhenReady = false
-            p.volume = 0f
-            p.pause()
+            try {
+                p.playWhenReady = false
+                p.volume = 0f
+                p.pause()
+            } catch (e: Exception) { /* player eliberat/oprit */ }
         }
     }
 
@@ -228,7 +258,17 @@ class VideoPagerAdapter(
      * Reia doar videoclipul activ (apelat la onResume - când app revine în prim-plan).
      */
     fun resumeActivePlayer() {
-        playerActiv?.let { it.volume = currentVolume; it.playWhenReady = true; it.play() }
+        val p = playerActiv ?: return
+        try {
+            p.volume = currentVolume
+            p.playWhenReady = true
+            p.play()
+        } catch (e: Exception) {
+            // dacă playerul a fost eliberat (ex. Activitate distrusă în fundal) sau e în
+            // stare invalidă, îl scoatem din activ și nu crăpăm
+            if (playerActiv === p) playerActiv = null
+            Log.w("VideoPagerAdapter", "resumeActiv: nu pot relua", e)
+        }
     }
 
     /**
@@ -238,12 +278,14 @@ class VideoPagerAdapter(
     fun isAnyPlayerPlaying(): Boolean {
         var any = false
         for (p in allPlayers()) {
-            if (p.playWhenReady && p.duration > 0 && p.currentPosition >= 0) {
-                any = true
-                break
-            }
+            try {
+                if (p.playWhenReady && p.duration > 0 && p.currentPosition >= 0) {
+                    any = true
+                    break
+                }
+            } catch (e: Exception) { /* player indisponibil */ }
         }
-        return any || (playerActiv?.isPlaying == true)
+        return any || (try { playerActiv?.isPlaying == true } catch (e: Exception) { false })
     }
 
     // secunde de derulare per pas/swipe orizontal - ajustabil din Setări (2..30)

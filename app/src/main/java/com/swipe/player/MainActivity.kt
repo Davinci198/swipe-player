@@ -700,9 +700,19 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         nouAdapter.setControlsVisible(ctrlVideoVizibil) // vizibilitatea butoanelor de control (Video)
         // la finalul videoclipului : trecem la următorul (doar dacă autoplay e activ, vezi adapter)
         nouAdapter.onItemEnded = {
-            val curent = viewPager.currentItem
-            if (curent < videouri.size - 1) {
-                viewPager.post { viewPager.setCurrentItem(curent + 1, true) }
+            // Gard anti-crash: callback-ul poate veni când Activity e în curs de distrugere
+            // (redare în fundal / PiP). Dacă adapter-ul nu mai e cel activ sau viewPager-ul
+            // nu mai e atașat, NU mai navigăm la următorul videoclip.
+            val trebuieNavigat = adapter === nouAdapter &&
+                viewPager.isAttachedToWindow &&
+                modCurent == "video"
+            if (trebuieNavigat) {
+                try {
+                    val curent = viewPager.currentItem
+                    if (curent < videouri.size - 1) {
+                        viewPager.post { if (adapter === nouAdapter) viewPager.setCurrentItem(curent + 1, true) }
+                    }
+                } catch (e: Exception) { /* ignoră - nu crăpăm în fundal */ }
             }
         }
         // aplică rezoluția salvată (Auto / 720p / 1080p)
@@ -798,6 +808,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         salveazaSetarileCurente()
         // altfel rămâne un service orfan + notificare după închiderea aplicației
         PlaybackService.stopPlaybackService(this)
+        // eliberăm toți ExoPlayerii la închiderea completă (evită crash/leak de playere
+        // legate de o Activitate distrusă); imaginile nu țin playere, doar decodează.
+        try { adapter?.elibereazaTot() } catch (e: Exception) { }
+        adapter = null
         try { unregisterReceiver(playbackControlReceiver) } catch (e: Exception) {}
         try { unregisterReceiver(phoneStateReceiver) } catch (e: Exception) {}
         // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
