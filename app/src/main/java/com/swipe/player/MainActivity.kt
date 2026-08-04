@@ -12,6 +12,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.util.Rational
+import android.app.PictureInPictureParams
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
@@ -127,6 +129,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     // modul curent: "video" sau "photo"
     private var modCurent: String = "video"
 
+    // true cât timp e deschis picker-ul de fișiere (galerie) → ca onUserLeaveHint să NU intre în PiP atunci
+    private var pickerDeschis = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -218,6 +223,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // Buton setari (colț dreapta jos - evită back-swipe din stânga sus)
         val btnSettings = findViewById<android.widget.ImageButton>(R.id.btnSettings)
         btnSettings.setOnClickListener { deschideSetari() }
+
+        // Buton Picture-in-Picture (se afișează doar dacă există conținut de afișat)
+        val btnPip = findViewById<android.widget.ImageButton>(R.id.btnPip)
+        btnPip.setOnClickListener { intraInPiP() }
+        btnPip.visibility = View.GONE
 
         // Scroll VERTICAL (sus/jos) - ca TikTok
         viewPager.orientation = ViewPager2.ORIENTATION_VERTICAL
@@ -352,8 +362,10 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         try {
+            pickerDeschis = true // previne intrarea în PiP la deschiderea galeriei
             startActivityForResult(intent, requestCode)
         } catch (e: Exception) {
+            pickerDeschis = false
             Toast.makeText(this, "Nu am găsit un picker de fișiere", Toast.LENGTH_LONG).show()
         }
     }
@@ -361,6 +373,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        pickerDeschis = false // am revenit din galerie; PiP-ul automat e din nou permis
         if (resultCode != RESULT_OK || data == null) return
         if (requestCode != REQUEST_VIDEOS && requestCode != REQUEST_PHOTOS) return
         val uriSele = mutableListOf<Uri>()
@@ -442,6 +455,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         actualizeazaMiniaturi()
         setMod("photo")
         tvStatus.text = "🖼️ ${lista.size} poze"
+        arataButonPipDacaAreLoc()
     }
 
     /** creionul din galeria de poze: dialog pentru REDENUMIREA pozei */
@@ -711,6 +725,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         tvStatus.text = "🎬 ${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"
         Toast.makeText(this, "S-au încărcat ${lista.size} videoclipuri", Toast.LENGTH_SHORT).show()
         setMod("video") // afișează pagerul de videoclipuri
+        arataButonPipDacaAreLoc()
     }
 
     private fun aplicaLumina(valoare: Float) {
@@ -726,6 +741,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onPause() {
         super.onPause()
+        // Dacă suntem în Picture-in-Picture, NU oprim redarea și NU pornim serviciul:
+        // activitatea e încă vizibilă în fereastra mică, deci playerul continuă normal.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+            return
+        }
         // Redare în fundal: dacă e activă și suntem în mod video, lăsăm sunetul să continue
         // (nu oprim playerul + pornim un foreground service care ține procesul prioritar,
         //  ca sistemul să NU taie sunetul din cauza Doze/WakeLock).
@@ -743,6 +763,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onStop() {
         super.onStop()
+        // Dacă suntem în Picture-in-Picture, NU oprim/ascundem redarea — continuă în fereastra mică.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) return
         // Redare în fundal: la Home/minimize păstrăm sunetul dacă opțiunea e activă (mod video)
         val continuareFundal = backgroundPlayCurent && modCurent == "video"
         if (!continuareFundal) {
@@ -784,6 +806,74 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             window.attributes = lp
         } catch (e: Exception) { /* ignoră */ }
+    }
+
+    // ===== Picture-in-Picture (PiP) — fereastră plutitoare pentru poze + videoclipuri =====
+    /** Afișează/ascunde butonul PiP în funcție de faptul că există conținut de arătat. */
+    private fun arataButonPipDacaAreLoc() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val existaContinut = (modCurent == "video" && videouri.isNotEmpty()) ||
+                (modCurent == "photo" && poze.isNotEmpty())
+            findViewById<View>(R.id.btnPip).visibility =
+                if (existaContinut) View.VISIBLE else View.GONE
+        } catch (e: Exception) { /* ignoră */ }
+    }
+
+    private fun intraInPiP() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        // Nu intrăm în PiP fără conținut
+        val existaContinut = (modCurent == "video" && videouri.isNotEmpty()) ||
+            (modCurent == "photo" && poze.isNotEmpty())
+        if (!existaContinut) return
+        try {
+            val ratio = Rational(16, 9)
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(ratio)
+                .build()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                enterPictureInPictureMode(params)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Nu pot intra în PiP", e)
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Nu intra în PiP dacă s-a deschis galeria/picker-ul de fișiere.
+        if (pickerDeschis) return
+        // Ieșire automată din aplicație => trecem în PiP dacă redăm ceva
+        // (în loc să oprim imaginea, continuăm redarea în fereastra plutitoare)
+        if (modCurent == "video" && adapter?.isAnyPlayerPlaying() != false) {
+            intraInPiP()
+        } else if (modCurent == "photo" && poze.isNotEmpty()) {
+            intraInPiP()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            // ascundem UI-ul (butoane, header, panouri) când suntem în PiP — rămâne doar conținutul
+            findViewById<View>(R.id.btnSettings).visibility = View.GONE
+            findViewById<View>(R.id.btnPip).visibility = View.GONE
+            findViewById<View>(R.id.headerOverlay).visibility = View.GONE
+            findViewById<View>(R.id.photoBottomPanel).visibility = View.GONE
+            findViewById<View>(R.id.photoRenameBtn).visibility = View.GONE
+            findViewById<View>(R.id.photoDeleteBtn).visibility = View.GONE
+            findViewById<View>(R.id.photoFavBtn).visibility = View.GONE
+        } else {
+            // revenire în prim-plan: readucem UI-ul în funcție de mod
+            findViewById<View>(R.id.btnSettings).visibility = View.VISIBLE
+            findViewById<View>(R.id.btnPip).visibility =
+                if (modCurent == "video" && videouri.isNotEmpty() || modCurent == "photo" && poze.isNotEmpty())
+                    View.VISIBLE else View.GONE
+            findViewById<View>(R.id.headerOverlay).visibility = View.VISIBLE
+            if (modCurent == "photo") {
+                findViewById<View>(R.id.photoBottomPanel).visibility = View.VISIBLE
+            }
+        }
     }
     private fun salveazaSetarileCurente() {
         try {

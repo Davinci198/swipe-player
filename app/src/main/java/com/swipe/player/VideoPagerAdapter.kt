@@ -144,19 +144,42 @@ class VideoPagerAdapter(
     // bind, deci la reutilizarea din pool NU se acumulează listeners și NU se scrie
     // progres pe videoclipul greșit.
     private fun creeazaListener(p: ExoPlayer): Player.Listener = object : Player.Listener {
+
+        // Gard anti-crash: callbacks-urile ExoPlayer pot ajunge DUPĂ ce Activity / ViewPager2
+        // au fost distruse (ex. redare în fundal). Dacă holder-ul e reciclat sau view-ul nu mai
+        // e atașat, NU atinge UI-ul => altfel "Swipe Player se oprește încontinuu".
+        private fun uiAttached(): Boolean {
+            val holder = playerHolder[p] ?: return false
+            val v = holder.itemView ?: return false
+            return v.isAttachedToWindow
+        }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                // Funcționează și în fundal / fără UI (progres + autoplay trebuie să meargă mereu)
+                salveazaProgres(numePentru(p), p, 100)
+                val holder = playerHolder[p] ?: let {
+                    if (autoOrder && pozitiePentru(p) == activePosition) {
+                        onItemEnded?.invoke()
+                    }
+                    return
+                }
+                if (holder.itemView.isAttachedToWindow) {
+                    holder.loadingContainer.visibility = View.GONE
+                }
+                if (autoOrder && pozitiePentru(p) == activePosition) {
+                    onItemEnded?.invoke()
+                }
+                return
+            }
+            if (!uiAttached()) {
+                // în fundal: chiar și fără UI, nu atingem UI-ul
+                return
+            }
             val holder = playerHolder[p] ?: return
             when (playbackState) {
                 Player.STATE_BUFFERING -> holder.loadingContainer.visibility = View.VISIBLE
                 Player.STATE_READY -> holder.loadingContainer.visibility = View.GONE
-                Player.STATE_ENDED -> {
-                    salveazaProgres(numePentru(p), p, 100)
-                    // autoplay: dacă e activ și videoclipul care s-a terminat e cel vizibil,
-                    // saltul la următorul se face din MainActivity (callback)
-                    if (autoOrder && pozitiePentru(p) == activePosition) {
-                        onItemEnded?.invoke()
-                    }
-                }
             }
         }
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -166,7 +189,12 @@ class VideoPagerAdapter(
             salveazaProgresDacaTimpul(numePentru(p), p)
         }
         override fun onPlayerError(error: PlaybackException) {
-            playerHolder[p]?.loadingContainer?.visibility = View.GONE
+            try {
+                val h = playerHolder[p] ?: return
+                if (h.itemView.isAttachedToWindow) {
+                    h.loadingContainer.visibility = View.GONE
+                }
+            } catch (e: Exception) { }
             Log.e(TAG, "Error: ${error.message}")
         }
     }

@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 
 /**
@@ -83,6 +84,12 @@ class PlaybackService : Service() {
             addAction(ACTION_PAUSE)
             addAction(ACTION_STOP)
         }
+        // Protejăm înregistrarea receiver-ului: dacă serviciul e repornit (ex. sistemul
+        // îl ține orfan fără activitate) și receiver-ul e deja înregistrat, un al doilea
+        // registerReceiver aici ar produce un loop de crash "se oprește încontinuu".
+        try {
+            unregisterReceiver(controlReceiver) // dacă e deja înregistrat, îl scoatem întâi
+        } catch (e: Exception) { /* nu era înregistrat */ }
         registerReceiver(controlReceiver, filter)
         startAsForeground()
     }
@@ -98,19 +105,31 @@ class PlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startAsForeground()
-        return START_STICKY
+        // START_NOT_STICKY: dacă sistemul ucide serviciul (optimizare baterie/Doze),
+        // NU-l repornim singur. Așa evităm un serviciu orfan care se re-pornește în
+        // buclă și cauzează "Swipe Player se oprește încontinuu".
+        return START_NOT_STICKY
     }
 
     private fun startAsForeground() {
-        val notif = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIF_ID,
-                notif,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-            )
-        } else {
-            startForeground(NOTIF_ID, notif)
+        try {
+            val notif = buildNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIF_ID,
+                    notif,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIF_ID, notif)
+            }
+        } catch (e: Exception) {
+            // Fallback sigur: nu lăsăm serviciul să crape; încercăm startForeground fără tip.
+            try {
+                startForeground(NOTIF_ID, buildNotification())
+            } catch (e2: Exception) {
+                Log.e("PlaybackService", "Nu pot porni foreground: $e2")
+            }
         }
     }
 

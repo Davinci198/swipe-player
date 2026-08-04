@@ -189,4 +189,21 @@
         android:padding="12dp"
         android:elevation="8dp"
         android:alpha="0.92" />
+
+    <!-- Buton Picture-in-Picture: colț dreapta sus, lângă Setări -->
+    <ImageButton
+        android:id="@+id/btnPip"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="80dp"
+        android:contentDescription="Redare în fereastră (PiP)"
+        android:background="@drawable/bg_settings"
+        android:src="@android:drawable/ic_menu_slideshow"
+        android:scaleType="centerInside"
+        android:padding="12dp"
+        android:elevation="8dp"
+        android:alpha="0.92"
+        android:visibility="gone" />
 </FrameLayout>
