@@ -11,8 +11,8 @@ android {
         applicationId = "com.swipe.player"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.0.25.3"
+        versionCode = 12
+        versionName = "1.0.26"
 
         // doar arhitecturi reale de arm avion (fără x86/x86_64 inutile)
         ndk {
@@ -54,7 +54,9 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Optimizare release: minify + shrink (regulile Keep Media3 există în proguard-rules.pro)
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val storeFilePath = System.getenv("RELEASE_STORE_FILE")
             if (storeFilePath != null && file(storeFilePath).exists()) {
