@@ -11,8 +11,8 @@ android {
         applicationId = "com.swipe.player"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.0.26"
+        versionCode = 13
+        versionName = "1.0.27"
 
         // doar arhitecturi reale de arm avion (fără x86/x86_64 inutile)
         ndk {

@@ -84,14 +84,29 @@ class PlaybackService : Service() {
             addAction(ACTION_PAUSE)
             addAction(ACTION_STOP)
         }
-        // Protejăm înregistrarea receiver-ului: dacă serviciul e repornit (ex. sistemul
-        // îl ține orfan fără activitate) și receiver-ul e deja înregistrat, un al doilea
-        // registerReceiver aici ar produce un loop de crash "se oprește încontinuu".
-        try {
-            unregisterReceiver(controlReceiver) // dacă e deja înregistrat, îl scoatem întâi
-        } catch (e: Exception) { /* nu era înregistrat */ }
-        registerReceiver(controlReceiver, filter)
+        // FIX crash pe Android 13+ (API 33): registerReceiver FĂRĂ flag RECEIVER_EXPORTED /
+        // RECEIVER_NOT_EXPORTED aruncă SecurityException la fiecare pornire a serviciului
+        // => "Swipe Player se oprește încontinuu" la redarea în fundal.
+        // controlReceiver e intern (doar control din notificare), deci RECEIVER_NOT_EXPORTED.
+        registerControlReceiver(filter)
         startAsForeground()
+    }
+
+    private fun registerControlReceiver(filter: IntentFilter) {
+        try {
+            // dacă serviciul e repornit (sistemul îl ține orfan), receiver-ul poate fi deja
+            // înregistrat => unregister întâi pt a evita IllegalArgumentException la re-register
+            try { unregisterReceiver(controlReceiver) } catch (e: Exception) { /* nu era */ }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(controlReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(controlReceiver, filter)
+            }
+        } catch (e: Exception) {
+            // niciodată să nu lăsăm serviciul să crape din cauza receiver-ului
+            Log.e("PlaybackService", "Nu pot înregistra controlReceiver: $e")
+        }
     }
 
     override fun onDestroy() {
