@@ -11,8 +11,8 @@ android {
         applicationId = "com.swipe.player"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.0.27"
+        versionCode = 14
+        versionName = "1.0.28"
 
         // doar arhitecturi reale de arm avion (fără x86/x86_64 inutile)
         ndk {
@@ -86,4 +86,6 @@ dependencies {
     implementation("androidx.media3:media3-common:1.3.1")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
+    // DragonBones prebuilt AAR (v1.1.0) - classes com.dragonbones.* + libdragonbones_native.so (4 ABIs)
+    implementation(files("libs/dragonbones-release.aar"))
 }
