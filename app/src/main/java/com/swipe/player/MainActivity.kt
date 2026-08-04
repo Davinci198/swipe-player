@@ -378,12 +378,20 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (e: Exception) { Log.w(TAG, "nu pot persista accesul: $e") }
         }
+        // ADUNA selecția la lista existentă (nu o înlocuiește!), ca să nu dispară
+        // pozele/videoclipurile adăugate anterior. Eliminăm duplicatele, păstrând ordinea.
         if (requestCode == REQUEST_VIDEOS) {
-            videouri.clear(); videouri.addAll(uriSele)
+            val existente = videouri.map { it.toString() }.toSet()
+            for (uri in uriSele) {
+                if (uri.toString() !in existente) videouri.add(uri)
+            }
             salveazaLista()
             incarcaLista(videouri)
         } else {
-            poze.clear(); poze.addAll(uriSele)
+            val existente = poze.map { it.toString() }.toSet()
+            for (uri in uriSele) {
+                if (uri.toString() !in existente) poze.add(uri)
+            }
             salveazaPoze()
             incarcaPoze(poze)
         }
