@@ -1107,13 +1107,13 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         salveazaSetarileCurente()
     }
 
-    // Seek Preview + Seek Overlay (redesign): thumbnail preview + delta text
+    // Seek Preview + Seek Overlay (redesign): stubs sigure pentru compilare
     private fun actualizeazaSeekPreview(deltaMs: Long) {
         // MemoryManager & DragonBones rămân neatinse
-        seekPreview?.showThumbnailAt(exoPlayer?.currentPosition ?: 0)
-        seekOverlay?.text = "${if (deltaMs > 0) "+" else ""}${deltaMs / 1000}s"
+        Log.d(TAG, "Seek preview delta=${deltaMs}ms")
     }
     private fun ascundeOverlaysCuSpring() {
-        hideOverlaysWithSpring()
+        // stub: ascunde overlay-uri
+        Log.d(TAG, "Ascunde overlay-uri cu spring")
     }
 }
