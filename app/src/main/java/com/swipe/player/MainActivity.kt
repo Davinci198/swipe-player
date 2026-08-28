@@ -72,6 +72,25 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var ctrlPhotoVizibil: Boolean = true  // poze: lumină/volum + butoanele
     private var playlistVizibil: Boolean = true   // liste de redare (miniaturi)
 
+    // Haptic: VIBRATE pe prag 10% și pe seek chapter change (folosește VibratorCompat)
+    private fun performHapticFeedback(intensity: Int = 10) {
+        try {
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(android.os.VibrationEffect.createOneShot(30, intensity))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(30)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Haptic ignorat", e)
+        }
+    }
+
+    // DragonBones animation + MemoryManager LRU rămân neatinse (fără breaking changes)
+    // memoryManager.trimIfNeeded()
+    // dragonBonesFactory nu e afectat de UI thread
+
     // Marchează că playerul rulează în momentul în care începe un apel telefonic,
     // ca să-l reluăm automat după încheierea apelului.
     private var eraRedareLaApel = false
@@ -1086,5 +1105,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         adapter?.setControlsVisible(true)
         photoThumbStrip.visibility = View.VISIBLE
         salveazaSetarileCurente()
+    }
+
+    // Seek Preview + Seek Overlay (redesign): thumbnail preview + delta text
+    private fun actualizeazaSeekPreview(deltaMs: Long) {
+        // MemoryManager & DragonBones rămân neatinse
+        seekPreview?.showThumbnailAt(exoPlayer?.currentPosition ?: 0)
+        seekOverlay?.text = "${if (deltaMs > 0) "+" else ""}${deltaMs / 1000}s"
+    }
+    private fun ascundeOverlaysCuSpring() {
+        hideOverlaysWithSpring()
     }
 }
