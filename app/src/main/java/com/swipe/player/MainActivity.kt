@@ -84,7 +84,7 @@ class MainActivity : AppCompatActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        memoryManager = MemoryManager(this)
+        memoryManager = MemoryManager.getInstance(this)
         dragonBonesBridge = DragonBonesBridge()
 
         // init player (păstrăm logica ta veche)
@@ -194,7 +194,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         hideOverlaysWithSpring()
                         // MemoryManager & DragonBones rămân neatinse:
-                        memoryManager.trimIfNeeded()
+                        memoryManager.getStatistici()
                         // dragonBonesFactory nu e afectat de UI thread
                     }
                     gestureType = Gesture.NONE
