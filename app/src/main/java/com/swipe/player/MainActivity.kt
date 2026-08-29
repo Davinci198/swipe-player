@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
                 hapticTick()
             }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-                timelineView.updateChapters(mediaItem?.mediaMetadata?.chapters ?: emptyList())
+                timelineView.updateChapters(emptyList())
             }
         })
 
@@ -267,7 +267,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         player.release()
         (dragonBonesBridge as? com.swipe.player.DragonBonesBridge)?.release()
-        dragonBonesBridge.release()
     }
 }
 
