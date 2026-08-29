@@ -123,7 +123,7 @@
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="8dp"
             android:text="+10s"
-            android:textColor="white"
+            android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:fontFamily="monospace" />
     </FrameLayout>
