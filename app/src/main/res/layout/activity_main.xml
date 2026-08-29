@@ -4,26 +4,210 @@
     android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#08080A">
+    android:background="#FF08080A">
 
-    <!-- Aici vine ViewPager2 / PlayerView existent -->
+    <!-- Pager VIDEOCLIPURI (swipe vertical). Folosește marginile stânga/dreapta pentru luminozitate/volum. -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- Original photo/video UI preserved -->
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/imagePager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <LinearLayout android:id="@+id/photoBottomPanel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:visibility="gone" />
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/photoThumbStrip" android:layout_width="match_parent" android:layout_height="92dp" android:layout_gravity="bottom" android:visibility="gone" />
-    <TextView android:id="@+id/tvStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="top|start" android:textColor="#DDFFFFFF" android:textSize="13sp" />
-    <ImageButton android:id="@+id/btnSettings" android:layout_width="56dp" android:layout_height="56dp" android:layout_gravity="top|end" android:visibility="gone" />
-    <ImageButton android:id="@+id/btnPip" android:layout_width="56dp" android:layout_height="56dp" android:layout_gravity="top|end" android:visibility="gone" />
+    <!-- Pager POZE (swipe vertical). Marginea de jos = înălțimea panoului foto (miniaturi + controale). -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/imagePager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="136dp"
+        android:visibility="gone" />
+
+    <!-- Header: comutator mod (Video / Poze) + status -->
+    <LinearLayout
+        android:id="@+id/headerOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_top_overlay">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#33FFFFFF"
+            android:padding="6dp">
+            <TextView
+                android:id="@+id/modeVideoBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎬 Video"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:background="#33FFFFFF" />
+            <TextView
+                android:id="@+id/modePhotoBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🖼️ Poze"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Alege fișiere din ⚙️ Setări"
+            android:textColor="#DDFFFFFF"
+            android:textSize="13sp"
+            android:layout_marginTop="6dp" />
+    </LinearLayout>
+
+    <!-- Creion REDENUMIRE poză -->
+    <ImageButton
+        android:id="@+id/photoRenameBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="88dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_pencil"
+        android:scaleType="centerInside"
+        android:padding="9dp"
+        android:contentDescription="Redenumește poza"
+        android:visibility="gone" />
+
+    <!-- Buton ȘTERGERE poză -->
+    <ImageButton
+        android:id="@+id/photoDeleteBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="144dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_delete"
+        android:scaleType="centerInside"
+        android:padding="9dp"
+        android:contentDescription="Șterge poza"
+        android:visibility="gone" />
+
+    <!-- Buton FAVORIT poză -->
+    <ImageButton
+        android:id="@+id/photoFavBtn"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="200dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_favorite"
+        android:scaleType="centerInside"
+        android:padding="9dp"
+        android:contentDescription="Favorit"
+        android:visibility="gone" />
+
+    <!-- Panoul FOTO (jos, doar modul Poze): controale + miniaturi -->
+    <LinearLayout
+        android:id="@+id/photoBottomPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:background="#E60A0A0D"
+        android:visibility="gone">
+
+        <!-- Rând controale luminozitate + volum -->
+        <LinearLayout
+            android:id="@+id/photoControlsBar"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="☀️"
+                android:textSize="16sp" />
+            <SeekBar
+                android:id="@+id/photoBrightnessSeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:max="1000" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:text="🔊"
+                android:textSize="16sp" />
+            <SeekBar
+                android:id="@+id/photoVolumeSeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:max="1000" />
+        </LinearLayout>
+
+        <!-- Miniaturi pentru navigare rapidă -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/photoThumbStrip"
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:clipToPadding="false"
+            android:scrollbars="none" />
+    </LinearLayout>
+
+    <!-- Buton setari: colț dreapta sus -->
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:contentDescription="Setări"
+        android:background="@drawable/bg_settings"
+        android:src="@android:drawable/ic_menu_manage"
+        android:scaleType="centerInside"
+        android:padding="12dp"
+        android:elevation="8dp"
+        android:alpha="0.92" />
+
+    <!-- Buton Picture-in-Picture -->
+    <ImageButton
+        android:id="@+id/btnPip"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="80dp"
+        android:contentDescription="Redare în fereastră (PiP)"
+        android:background="@drawable/bg_settings"
+        android:src="@android:drawable/ic_menu_slideshow"
+        android:scaleType="centerInside"
+        android:padding="12dp"
+        android:elevation="8dp"
+        android:alpha="0.92"
+        android:visibility="gone" />
+
+    <!-- ====== Overlay NEON (design nou) ====== -->
 
     <!-- Overlay stanga BRIGHTNESS -->
     <FrameLayout
@@ -79,7 +263,8 @@
         android:layout_gravity="center_vertical|end"
         android:layout_marginEnd="24dp"
         android:background="@drawable/bg_glass_neon"
-        android:visibility="gone">
+        android:visibility="gone"
+        android:elevation="20dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -136,7 +321,7 @@
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="8dp"
             android:text="+10s"
-            android:textColor="white"
+            android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:fontFamily="monospace" />
     </FrameLayout>
