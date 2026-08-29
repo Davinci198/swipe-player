@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
     private lateinit var audioManager: AudioManager
     private lateinit var memoryManager: MemoryManager
-    private lateinit var dragonBonesBridge: DragonBonesBridge
+    private var dragonBonesBridge: Any? = null
 
     // Views - presupunem existența în activity_main.xml
     private lateinit var rootContainer: FrameLayout
@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         memoryManager = MemoryManager.getInstance(this)
-        dragonBonesBridge = DragonBonesBridge()
+        dragonBonesBridge = null // TODO: restore when NDK bridge merged
 
         // init player (păstrăm logica ta veche)
         player = ExoPlayer.Builder(this).build()
@@ -110,7 +110,7 @@ class MainActivity : AppCompatActivity() {
             ) {
                 // update timeline neon cu capitole
                 timelineView.updateChapters(
-                    player.currentMediaItem?.mediaMetadata?.chapters ?: emptyList()
+                    emptyList() ?: emptyList()
                 )
                 hapticTick()
             }
@@ -266,6 +266,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         player.release()
+        (dragonBonesBridge as? com.swipe.player.DragonBonesBridge)?.release()
         dragonBonesBridge.release()
     }
 }
