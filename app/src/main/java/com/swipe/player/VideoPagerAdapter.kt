@@ -493,6 +493,14 @@ class VideoPagerAdapter(
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    // FIX #85: vertical dominant de la început => lasă ViewPager-ul să facă swipe (nu gesturi interne)
+                    val dx = event.x - holder.dragStartX
+                    val dyFix = event.y - holder.dragStartY
+                    if (holder.dragMod == 0 && Math.abs(dyFix) > Math.abs(dx) && Math.abs(dyFix) > 30) {
+                        holder.dragMod = 4
+                        return@setOnTouchListener false
+                    }
+                    if (holder.dragMod == 4) return@setOnTouchListener false
                     val dy = h.dragStartY - event.y
                     val dxTotal = event.x - h.dragStartX
                     val dyTotal = h.dragStartY - event.y
@@ -562,6 +570,7 @@ class VideoPagerAdapter(
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (h.dragMod == 4) { h.dragMod = 0; return@setOnTouchListener false }
                     // seek REAL o singură dată, la ridicarea degetului (nu la fiecare move)
                     if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
                         player.seekTo(h.seekTargetMs)
