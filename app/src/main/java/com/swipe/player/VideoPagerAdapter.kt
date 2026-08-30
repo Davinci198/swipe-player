@@ -320,6 +320,12 @@ class VideoPagerAdapter(
         val seekIndicator: LinearLayout = view.findViewById(R.id.seekIndicator)
         val seekTime: TextView = view.findViewById(R.id.seekTime)
         val seekProgress: android.widget.ProgressBar = view.findViewById(R.id.seekProgress)
+        // Overlay-uri NEON noi (design #08080A / #FF2A3D) + stratul de intercept
+        val touchIntercept: View = view.findViewById(R.id.touchIntercept)
+        val brightnessOverlay: View = view.findViewById(R.id.brightnessOverlay)
+        val volumeOverlay: View = view.findViewById(R.id.volumeOverlay)
+        val brightnessProgressBar: android.widget.ProgressBar = view.findViewById(R.id.brightnessProgress)
+        val volumeProgressBar: android.widget.ProgressBar = view.findViewById(R.id.volumeProgress)
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
         var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
@@ -441,7 +447,7 @@ class VideoPagerAdapter(
         val h = holder // referință locală pentru readabilitate
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
-        h.touchCatcher.setOnTouchListener { view, event ->
+        h.touchIntercept.setOnTouchListener { view, event ->
             // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating).
             // Chiar și după ce ridici un deget (pointerCount=1) rămânem în modul pinch până
             // la ACTION_UP, ca să NU se combine cu luminozitatea/volumul (bug „zip" final).
@@ -730,14 +736,16 @@ class VideoPagerAdapter(
     }
     private fun showVerticalIndicator(holder: VH?, kind: Int, level: Float) {
         holder ?: return
-        if (kind == 2) { // luminozitate (stânga)
-            holder.brightnessIndicator.visibility = View.VISIBLE
-            setVerticalFill(holder.brightnessFill, level)
-            holder.volumeIndicator.visibility = View.GONE
-        } else if (kind == 1) { // volum (dreapta)
-            holder.volumeIndicator.visibility = View.VISIBLE
-            setVerticalFill(holder.volumeFill, level)
-            holder.brightnessIndicator.visibility = View.GONE
+        holder.brightnessOverlay.bringToFront()
+        holder.volumeOverlay.bringToFront()
+        if (kind == 2) { // luminozitate (stânga) -> overlay NEON stânga
+            holder.brightnessOverlay.visibility = View.VISIBLE
+            holder.brightnessProgressBar.progress = (level.coerceIn(0f, 1f) * 100).toInt()
+            holder.volumeOverlay.visibility = View.GONE
+        } else if (kind == 1) { // volum (dreapta) -> overlay NEON dreapta
+            holder.volumeOverlay.visibility = View.VISIBLE
+            holder.volumeProgressBar.progress = (level.coerceIn(0f, 1f) * 100).toInt()
+            holder.brightnessOverlay.visibility = View.GONE
         }
     }
     private fun showSeekIndicator(holder: VH?, posMs: Long, durMs: Long) {
@@ -752,6 +760,9 @@ class VideoPagerAdapter(
         holder.brightnessIndicator.visibility = View.GONE
         holder.volumeIndicator.visibility = View.GONE
         holder.seekIndicator.visibility = View.GONE
+        // ascund și overlay-urile NEON noi
+        holder.brightnessOverlay.visibility = View.GONE
+        holder.volumeOverlay.visibility = View.GONE
     }
     private fun fmtTimp(ms: Long): String {
         val s = (ms / 1000).coerceAtLeast(0)
