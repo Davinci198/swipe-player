@@ -3,22 +3,19 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF050507"
-    android:fitsSystemWindows="false"
-    android:clipChildren="false"
-    android:clipToPadding="false">
+    android:background="#000000">
 
-    <!-- 1. PlayerView (video) -->
+    <!-- 1. PlayerView - FIX PRINCIPAL: zoom + texture_view + match_parent -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:use_controller="true"
-        app:resize_mode="fit" />
+        app:use_controller="false"
+        app:resize_mode="zoom"
+        app:surface_type="texture_view"
+        app:shutter_background_color="#000000" />
 
-    <!-- 1b. Overlay de attenuire (dim) pt luminozitate: fallback vizibil cand
-         window.screenBrightness e blocat pe Motorola fara WRITE_SETTINGS.
-         Alpha controlat din cod; DEDESUBT touch_catcher. -->
+    <!-- 1b. Overlay dim -->
     <View
         android:id="@+id/dimOverlay"
         android:layout_width="match_parent"
@@ -28,14 +25,13 @@
         android:focusable="false"
         android:visibility="invisible" />
 
-    <!-- 2. Loading - DEASUPRA video, DEDESUBT touch_catcher.
-         clickable=false ca sa nu-si insuseasca touch; elevatie mica. -->
+    <!-- 2. Loading -->
     <LinearLayout
+        android:id="@+id/loadingContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:id="@+id/loadingContainer"
         android:clickable="false"
         android:focusable="false"
         android:elevation="1dp">
@@ -52,8 +48,7 @@
             android:layout_marginTop="16dp" />
     </LinearLayout>
 
-    <!-- Indicator luminozitate (fallback vizual, stânga): bara verticală umplută cu alb
-         după nivel (0..1). Vizibil doar în timpul swipe-ului vertical pe stânga. -->
+    <!-- Brightness -->
     <FrameLayout
         android:id="@+id/brightnessIndicator"
         android:layout_width="wrap_content"
@@ -78,7 +73,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Indicator volum (fallback vizual, dreapta): bara verticală umplută după nivel. -->
+    <!-- Volume -->
     <FrameLayout
         android:id="@+id/volumeIndicator"
         android:layout_width="wrap_content"
@@ -103,7 +98,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Indicator seek (derulare stânga/dreapta): bară orizontală jos + timp curent. -->
+    <!-- Seek -->
     <LinearLayout
         android:id="@+id/seekIndicator"
         android:layout_width="match_parent"
@@ -134,9 +129,7 @@
             android:max="1000" />
     </LinearLayout>
 
-    <!-- 3. Perdea/touch_catcher: ULTIMUL strat full-screen, DEASUPRA video si loading.
-         clickable + focusable + elevation => asigura primirea touch pe Stock/Motorola.
-         Ramane DEDESUBT nume si buton fav (declarate mai jos). -->
+    <!-- Touch catcher -->
     <View
         android:id="@+id/touch_catcher"
         android:layout_width="match_parent"
@@ -146,8 +139,6 @@
         android:focusable="true"
         android:elevation="10dp" />
 
-    <!-- Nume videoclip + buton fav: declarate DUPĂ touch_catcher => deasupra lui
-         (FrameLayout desenează ultimul copil în față), elevation 11dp pt siguranță. -->
     <TextView
         android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
@@ -170,10 +161,6 @@
         android:scaleType="fitCenter"
         android:src="@android:drawable/btn_star_big_off" />
 
-    <!-- Butoane de derulare rapidă ⏪/⏩ (pas = N secunde configurat în Setări).
-         Poziționate pe laturi la vertical-mijloc, SUS de zona nume-video/controller,
-         ca să NU se suprapună. Elevation mare (>11dp) ca să prindă click-urile peste
-         touch_catcher (10dp). -->
     <ImageButton
         android:id="@+id/btnSeekBack"
         android:layout_width="56dp"
