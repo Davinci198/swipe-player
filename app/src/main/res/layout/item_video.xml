@@ -5,13 +5,13 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- 1. PlayerView - FIX PRINCIPAL: zoom + texture_view + match_parent -->
+    <!-- 1. PlayerView - FIX: fit în loc de zoom -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:use_controller="false"
-        app:resize_mode="zoom"
+        app:resize_mode="fit"
         app:surface_type="texture_view"
         app:shutter_background_color="#000000" />
 
@@ -181,6 +181,4 @@
         android:elevation="20dp"
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
-        android:contentDescription="Înainte"
-        android:src="@android:drawable/ic_media_ff" />
-</FrameLayout>
+        android:content
