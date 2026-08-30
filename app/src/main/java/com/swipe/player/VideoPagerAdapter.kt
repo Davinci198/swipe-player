@@ -493,60 +493,44 @@ class VideoPagerAdapter(
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    // FIX #86: decizie direcție la început — SEEK orizontal sau SWIPE vertical TikTok
-                    val dx = event.x - holder.dragStartX
-                    val dy = h.dragStartY - event.y
-                    if (h.dragMod == 0) {
-                        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
-                            h.dragMod = 3 // SEEK orizontal
-                            // nu dăm return — lasăm logica de seek de mai jos să ruleze
-                        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 30) {
-                            h.dragMod = 4 // SWIPE vertical TikTok -> lasăm ViewPager-ul să facă scroll
-                            return@setOnTouchListener false
+                    // FIX #87: decizie UȘOARĂ (15px) la prima mișcare, din orice zonă
+                    val dx = event.x - h.dragStartX
+                    val dy = event.y - h.dragStartY
+                    val w87 = view.width.toFloat().coerceAtLeast(1f)
+                    val isLeft = h.dragStartX < w87 * 0.25f
+                    val isRight = h.dragStartX > w87 * 0.75f
+                    if (h.dragMod == 0 && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
+                        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
+                            if (isLeft || isRight) {
+                                h.dragMod = if (isLeft) 1 else 2 // 1=brightness, 2=volum
+                            } else {
+                                h.dragMod = 4 // vertical TikTok -> lasăm ViewPager-ul
+                                return@setOnTouchListener false
+                            }
+                        } else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 15) {
+                            h.dragMod = 3 // seek orizontal — ORICE zonă
                         }
                     }
                     if (h.dragMod == 4) return@setOnTouchListener false
-                    val dxTotal = event.x - h.dragStartX
-                    val dyTotal = h.dragStartY - event.y
-
-                    // DECIZIE la prima mișcare semnificativă: direcția dominantă alege modul.
-                    // ORIZONTAL dominant -> SEEK (oriunde pe ecran). VERTICAL dominant -> zona de pornire.
-                    if (h.dragMod == 0) {
-                        val adx = kotlin.math.abs(dxTotal)
-                        val ady = kotlin.math.abs(dyTotal)
-                        if (adx < 12f && ady < 12f) return@setOnTouchListener true // prea puțin, aștept
-                        h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
-                        when (h.dragMod) {
-                            2 -> showVerticalIndicator(h, 2, currentBrightness)
-                            1 -> showVerticalIndicator(h, 1, currentVolume)
-                            3 -> {
-                                val d = player.duration.coerceAtLeast(0L)
-                                if (d > 0) showSeekIndicator(h, player.currentPosition, d)
-                                h.dragStartPosMs = player.currentPosition
-                                h.dragStartX = event.x // resetez originea pentru dx de seek
-                            }
-                        }
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                        return@setOnTouchListener true
-                    }
+                    if (h.dragMod == 0) return@setOnTouchListener true // încă nedecis, îl ținem noi
 
                     when (h.dragMod) {
-                        2 -> { // BRIGHTNESS: dy * 0.002f adunat incremental (ca în demo)
-                            currentBrightness = (currentBrightness + dy * 0.002f).coerceIn(0.01f, 1f)
+                        1 -> { // BRIGHTNESS: dy * 0.002f adunat incremental (ca în demo); dy sus=negativ -> mai luminos
+                            currentBrightness = (currentBrightness - dy * 0.002f).coerceIn(0.01f, 1f)
                             h.dragStartY = event.y // delta incremental
                             onBrightnessChange?.invoke(currentBrightness)
                             aplicaDim(h, currentBrightness) // fallback vizual (Motorola)
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        1 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
+                        2 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
                             // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
                             val pasi = (kotlin.math.abs(dy) / 8f).toInt().coerceAtLeast(1)
                             val am = audioManager()
                             repeat(pasi) {
                                 am?.adjustStreamVolume(
                                     AudioManager.STREAM_MUSIC,
-                                    if (dy > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                                    if (dy < 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
                                     0
                                 )
                             }
@@ -559,10 +543,10 @@ class VideoPagerAdapter(
                             h.dragStartY = event.y // delta incremental, ca la luminozitate
                             true
                         }
-                        3 -> { // SEEK: preview fluid la MOVE (fără seekTo); seek REAL doar la UP
+                        3 -> { // SEEK: dx / w * 120 secunde (preview fluid la MOVE; seek REAL doar la UP)
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                val deltaMs = (dxTotal * 0.3f).toLong()
+                                val deltaMs = (dx / w87 * 120_000f).toLong()
                                 val target = (h.dragStartPosMs + deltaMs).coerceIn(0L, durata)
                                 h.seekTargetMs = target // rețin ținta; NU seek aici (rebuffer lent la fiecare move)
                                 h.seekActive = true
