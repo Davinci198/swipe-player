@@ -1,6 +1,10 @@
 name: Build APK
 
 on:
+  push:
+    branches: [ main, "redesign/*", "feature/*" ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       build_variant:
