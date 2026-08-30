@@ -10,8 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:resize_mode="fit"
-        app:use_controller="false"
-        app:controller_layout_id="@layout/exo_controller_view" />
+        app:use_controller="false" />
 
     <!-- Dim pentru brightness -->
     <View
