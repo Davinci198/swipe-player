@@ -76,7 +76,8 @@ jobs:
       - name: Set artifact name
         run: |
           SAFE_BRANCH=$(echo "${{ github.ref_name }}" | sed "s/\//-/g")
-          echo "artifact_name=swipe-player-debug-${SAFE_BRANCH}-${{ github.sha[0:8] }}" >> $GITHUB_ENV
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          echo "artifact_name=swipe-player-debug-${SAFE_BRANCH}-${SHORT_SHA}" >> $GITHUB_ENV
 
       - name: Upload Debug APK
         if: success()
