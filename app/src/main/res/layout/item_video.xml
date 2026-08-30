@@ -218,27 +218,27 @@
          bară verticală GALBENĂ, procent alb JOS (ca în demo) -->
     <LinearLayout
         android:id="@+id/brightnessOverlay"
-        android:layout_width="64dp"
-        android:layout_height="220dp"
+        android:layout_width="52dp"
+        android:layout_height="170dp"
         android:layout_gravity="center_vertical|start"
-        android:layout_marginStart="20dp"
+        android:layout_marginStart="16dp"
         android:background="@drawable/bg_overlay_dark"
         android:visibility="gone"
         android:orientation="vertical"
         android:gravity="center"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
+        android:paddingTop="11dp"
+        android:paddingBottom="11dp"
         android:elevation="30dp">
         <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:src="@drawable/ic_brightness"
             android:tint="#FFC107" />
         <ProgressBar
             android:id="@+id/brightnessProgress"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="130dp"
-            android:layout_height="8dp"
+            android:layout_width="96dp"
+            android:layout_height="6dp"
             android:layout_weight="1"
             android:rotation="-90"
             android:max="100"
@@ -250,35 +250,35 @@
             android:layout_height="wrap_content"
             android:text="100%"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Overlay VOLUME (dreapta): pill sticlă 64dp x 220dp, iconiță roșie SUS,
+    <!-- Overlay VOLUME (dreapta): pill sticlă 52dp x 170dp, iconiță roșie SUS,
          bară verticală ROȘIE, procent alb JOS (ca în demo) -->
     <LinearLayout
         android:id="@+id/volumeOverlay"
-        android:layout_width="64dp"
-        android:layout_height="220dp"
+        android:layout_width="52dp"
+        android:layout_height="170dp"
         android:layout_gravity="center_vertical|end"
-        android:layout_marginEnd="20dp"
+        android:layout_marginEnd="16dp"
         android:background="@drawable/bg_overlay_dark"
         android:visibility="gone"
         android:orientation="vertical"
         android:gravity="center"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
+        android:paddingTop="11dp"
+        android:paddingBottom="11dp"
         android:elevation="30dp">
         <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:src="@drawable/ic_volume"
             android:tint="#FF2A3D" />
         <ProgressBar
             android:id="@+id/volumeProgress"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="130dp"
-            android:layout_height="8dp"
+            android:layout_width="96dp"
+            android:layout_height="6dp"
             android:layout_weight="1"
             android:rotation="-90"
             android:max="100"
@@ -290,7 +290,7 @@
             android:layout_height="wrap_content"
             android:text="100%"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>

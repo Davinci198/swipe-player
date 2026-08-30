@@ -474,36 +474,50 @@ class VideoPagerAdapter(
 
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // decizie O SINGURĂ DATĂ la DOWN, pe baza lui x (ca în demo):
-                    // stânga (<33%) = BRIGHTNESS, dreapta (>66%) = VOLUME, mijloc = SEEK
                     h.dragStartX = event.x
                     h.dragStartY = event.y
                     h.dragStartPosMs = player.currentPosition
                     h.seekActive = false
                     h.seekTargetMs = -1L
                     val w = view.width.toFloat().coerceAtLeast(1f)
-                    h.dragMod = when {
-                        event.x < w * 0.33f -> 2 // BRIGHTNESS (stânga)
-                        event.x > w * 0.66f -> 1 // VOLUME (dreapta)
-                        else -> 3                // SEEK (mijloc)
+                    // zonă de pornire (folosită doar ca sugestie inițială; direcția decide definitiv la MOVE)
+                    h.dragZona = when {
+                        event.x < w * 0.33f -> 2 // sugestie BRIGHTNESS (stânga)
+                        event.x > w * 0.66f -> 1 // sugestie VOLUME (dreapta)
+                        else -> 3                // sugestie SEEK (mijloc)
                     }
-                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} mod=${h.dragMod}")
-                    // arată overlay-ul corespunzător + feedback haptic la început
-                    when (h.dragMod) {
-                        2 -> showVerticalIndicator(h, 2, currentBrightness)
-                        1 -> showVerticalIndicator(h, 1, currentVolume)
-                        3 -> {
-                            val d = player.duration.coerceAtLeast(0L)
-                            if (d > 0) showSeekIndicator(h, player.currentPosition, d)
-                        }
-                    }
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                    // blochez scroll-ul ViewPager pe durata gestului (gesturile sunt consumate aici)
+                    h.dragMod = 0 // nedecis încă — aștept prima mișcare ca să văd direcția dominantă
+                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} zona=${h.dragZona}")
+                    // blochez scroll-ul ViewPager pe durata gestului
                     view.parent?.requestDisallowInterceptTouchEvent(true)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dy = h.dragStartY - event.y
+                    val dxTotal = event.x - h.dragStartX
+                    val dyTotal = h.dragStartY - event.y
+
+                    // DECIZIE la prima mișcare semnificativă: direcția dominantă alege modul.
+                    // ORIZONTAL dominant -> SEEK (oriunde pe ecran). VERTICAL dominant -> zona de pornire.
+                    if (h.dragMod == 0) {
+                        val adx = kotlin.math.abs(dxTotal)
+                        val ady = kotlin.math.abs(dyTotal)
+                        if (adx < 12f && ady < 12f) return@setOnTouchListener true // prea puțin, aștept
+                        h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
+                        when (h.dragMod) {
+                            2 -> showVerticalIndicator(h, 2, currentBrightness)
+                            1 -> showVerticalIndicator(h, 1, currentVolume)
+                            3 -> {
+                                val d = player.duration.coerceAtLeast(0L)
+                                if (d > 0) showSeekIndicator(h, player.currentPosition, d)
+                                h.dragStartPosMs = player.currentPosition
+                                h.dragStartX = event.x // resetez originea pentru dx de seek
+                            }
+                        }
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        return@setOnTouchListener true
+                    }
+
                     when (h.dragMod) {
                         2 -> { // BRIGHTNESS: dy * 0.002f adunat incremental (ca în demo)
                             currentBrightness = (currentBrightness + dy * 0.002f).coerceIn(0.01f, 1f)
@@ -513,8 +527,8 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        1 -> { // VOLUME: trepte sistem (raise/lower) ca în demo; prag 60px
-                            if (kotlin.math.abs(dy) >= 60f) {
+                        1 -> { // VOLUME: trepte sistem; prag 25px (mai reactiv, ca luminozitatea)
+                            if (kotlin.math.abs(dy) >= 25f) {
                                 val am = audioManager()
                                 am?.adjustStreamVolume(
                                     AudioManager.STREAM_MUSIC,
@@ -534,7 +548,7 @@ class VideoPagerAdapter(
                         3 -> { // SEEK: preview fluid la MOVE (fără seekTo); seek REAL doar la UP
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                val deltaMs = ((event.x - h.dragStartX) * 0.3f).toLong()
+                                val deltaMs = (dxTotal * 0.3f).toLong()
                                 val target = (h.dragStartPosMs + deltaMs).coerceIn(0L, durata)
                                 h.seekTargetMs = target // rețin ținta; NU seek aici (rebuffer lent la fiecare move)
                                 h.seekActive = true
