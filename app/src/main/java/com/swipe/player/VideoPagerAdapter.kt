@@ -497,12 +497,12 @@ class VideoPagerAdapter(
                     val dxTotal = event.x - h.dragStartX
                     val dyTotal = h.dragStartY - event.y
 
-                    // DECIZIE la prima mișcare semnificativă: direcția dominantă alege modul.
+                    // DECIZIE la prima miscare semnificativa: directia dominanta alege modul.
                     // ORIZONTAL dominant -> SEEK (oriunde pe ecran). VERTICAL dominant -> zona de pornire.
                     if (h.dragMod == 0) {
                         val adx = kotlin.math.abs(dxTotal)
                         val ady = kotlin.math.abs(dyTotal)
-                        if (adx < 12f && ady < 12f) return@setOnTouchListener true // prea puțin, aștept
+                        if (adx < 8f && ady < 8f) return@setOnTouchListener true // prea putin, astept
                         h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
                         when (h.dragMod) {
                             2 -> showVerticalIndicator(h, 2, currentBrightness)
@@ -511,10 +511,15 @@ class VideoPagerAdapter(
                                 val d = player.duration.coerceAtLeast(0L)
                                 if (d > 0) showSeekIndicator(h, player.currentPosition, d)
                                 h.dragStartPosMs = player.currentPosition
-                                h.dragStartX = event.x // resetez originea pentru dx de seek
+                                // NU resetez dragStartX: dx rămâne total de la DOWN => delta de seek corect
                             }
                         }
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        // reconfirm blocarea parintelui (ViewPager2 poate fura MOVE orizontal la inceput de seek)
+                        if (h.dragMod == 3) {
+                            var p = view.parent
+                            while (p != null) { p.requestDisallowInterceptTouchEvent(true); p = p.parent }
+                        }
                         return@setOnTouchListener true
                     }
 
@@ -527,24 +532,12 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        1 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
-                            // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
-                            val pasi = (kotlin.math.abs(dy) / 8f).toInt().coerceAtLeast(1)
-                            val am = audioManager()
-                            repeat(pasi) {
-                                am?.adjustStreamVolume(
-                                    AudioManager.STREAM_MUSIC,
-                                    if (dy > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-                                    0
-                                )
-                            }
-                            val max = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-                            val cur = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-                            currentVolume = if (max > 0) cur.toFloat() / max else currentVolume
-                            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
+                        1 -> { // VOLUME: continuu, IDENTIC cu luminozitatea (acelasi coeficient dy*0.002f)
+                            currentVolume = (currentVolume + dy * 0.002f).coerceIn(0f, 1f)
+                            h.dragStartY = event.y // delta incremental, ca la luminozitate
+                            aplicaVolumSistem(currentVolume) // setStreamVolume exact + castig player
                             onVolumeChange?.invoke(currentVolume)
                             showVerticalIndicator(h, 1, currentVolume)
-                            h.dragStartY = event.y // delta incremental, ca la luminozitate
                             true
                         }
                         3 -> { // SEEK: preview fluid la MOVE (fără seekTo); seek REAL doar la UP
