@@ -326,6 +326,8 @@ class VideoPagerAdapter(
         val volumeOverlay: View = view.findViewById(R.id.volumeOverlay)
         val brightnessProgressBar: android.widget.ProgressBar = view.findViewById(R.id.brightnessProgress)
         val volumeProgressBar: android.widget.ProgressBar = view.findViewById(R.id.volumeProgress)
+        val brightnessPct: TextView = view.findViewById(R.id.brightnessPct)
+        val volumePct: TextView = view.findViewById(R.id.volumePct)
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
         var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
@@ -707,11 +709,15 @@ class VideoPagerAdapter(
         holder.volumeOverlay.bringToFront()
         if (kind == 2) { // luminozitate (stânga) -> overlay NEON stânga
             holder.brightnessOverlay.visibility = View.VISIBLE
-            holder.brightnessProgressBar.progress = (level.coerceIn(0f, 1f) * 100).toInt()
+            val pct = (level.coerceIn(0f, 1f) * 100).toInt()
+            holder.brightnessProgressBar.progress = pct
+            holder.brightnessPct.text = "$pct%"
             holder.volumeOverlay.visibility = View.GONE
         } else if (kind == 1) { // volum (dreapta) -> overlay NEON dreapta
             holder.volumeOverlay.visibility = View.VISIBLE
-            holder.volumeProgressBar.progress = (level.coerceIn(0f, 1f) * 100).toInt()
+            val pct = (level.coerceIn(0f, 1f) * 100).toInt()
+            holder.volumeProgressBar.progress = pct
+            holder.volumePct.text = "$pct%"
             holder.brightnessOverlay.visibility = View.GONE
         }
     }
