@@ -536,23 +536,22 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        1 -> { // VOLUME: trepte sistem direct la fiecare MOVE (ca în demo, FĂRĂ prag)
-                            val pasi = (ady / 8f).toInt().coerceAtLeast(1)
-                            val am = audioManager()
-                            repeat(pasi) {
+                        1 -> { // VOLUME: trepte sistem cu prag (ca în demo, fără flooding)
+                            if (kotlin.math.abs(dy) >= 8f * view.context.resources.displayMetrics.density) {
+                                val am = audioManager()
                                 am?.adjustStreamVolume(
                                     AudioManager.STREAM_MUSIC,
-                                    if (dy > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                                    if (dy > 0) AudioManager.ADJUST_LOWER else AudioManager.ADJUST_RAISE,
                                     0
                                 )
+                                val max = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+                                val cur = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                                currentVolume = if (max > 0) cur.toFloat() / max else currentVolume
+                                playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
+                                onVolumeChange?.invoke(currentVolume)
+                                showVerticalIndicator(h, 1, currentVolume)
+                                h.dragStartY = event.y // reset prag
                             }
-                            val max = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-                            val cur = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-                            currentVolume = if (max > 0) cur.toFloat() / max else currentVolume
-                            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
-                            onVolumeChange?.invoke(currentVolume)
-                            showVerticalIndicator(h, 1, currentVolume)
-                            h.dragStartY = event.y // delta incremental
                             true
                         }
                         3 -> { // SEEK: preview la fiecare MOVE; seek REAL doar la UP
