@@ -5,7 +5,6 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- 1. PlayerView - FIX: fit în loc de zoom -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
@@ -15,7 +14,6 @@
         app:surface_type="texture_view"
         app:shutter_background_color="#000000" />
 
-    <!-- 1b. Overlay dim -->
     <View
         android:id="@+id/dimOverlay"
         android:layout_width="match_parent"
@@ -25,7 +23,6 @@
         android:focusable="false"
         android:visibility="invisible" />
 
-    <!-- 2. Loading -->
     <LinearLayout
         android:id="@+id/loadingContainer"
         android:layout_width="match_parent"
@@ -48,7 +45,6 @@
             android:layout_marginTop="16dp" />
     </LinearLayout>
 
-    <!-- Brightness -->
     <FrameLayout
         android:id="@+id/brightnessIndicator"
         android:layout_width="wrap_content"
@@ -73,7 +69,6 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Volume -->
     <FrameLayout
         android:id="@+id/volumeIndicator"
         android:layout_width="wrap_content"
@@ -98,7 +93,6 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Seek -->
     <LinearLayout
         android:id="@+id/seekIndicator"
         android:layout_width="match_parent"
@@ -129,7 +123,6 @@
             android:max="1000" />
     </LinearLayout>
 
-    <!-- Touch catcher -->
     <View
         android:id="@+id/touch_catcher"
         android:layout_width="match_parent"
@@ -170,7 +163,7 @@
         android:elevation="20dp"
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
-        android:contentDescription="Înapoi"
+        android:contentDescription="Inapoi"
         android:src="@android:drawable/ic_media_rew" />
     <ImageButton
         android:id="@+id/btnSeekFwd"
@@ -181,4 +174,6 @@
         android:elevation="20dp"
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
-        android:content
+        android:contentDescription="Inainte"
+        android:src="@android:drawable/ic_media_ff" />
+</FrameLayout>
