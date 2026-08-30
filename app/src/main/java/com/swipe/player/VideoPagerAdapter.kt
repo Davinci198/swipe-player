@@ -493,15 +493,19 @@ class VideoPagerAdapter(
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    // FIX #85: vertical dominant de la început => lasă ViewPager-ul să facă swipe (nu gesturi interne)
+                    // FIX #86: decizie direcție la început — SEEK orizontal sau SWIPE vertical TikTok
                     val dx = event.x - holder.dragStartX
-                    val dyFix = event.y - holder.dragStartY
-                    if (holder.dragMod == 0 && Math.abs(dyFix) > Math.abs(dx) && Math.abs(dyFix) > 30) {
-                        holder.dragMod = 4
-                        return@setOnTouchListener false
-                    }
-                    if (holder.dragMod == 4) return@setOnTouchListener false
                     val dy = h.dragStartY - event.y
+                    if (h.dragMod == 0) {
+                        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+                            h.dragMod = 3 // SEEK orizontal
+                            // nu dăm return — lasăm logica de seek de mai jos să ruleze
+                        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 30) {
+                            h.dragMod = 4 // SWIPE vertical TikTok -> lasăm ViewPager-ul să facă scroll
+                            return@setOnTouchListener false
+                        }
+                    }
+                    if (h.dragMod == 4) return@setOnTouchListener false
                     val dxTotal = event.x - h.dragStartX
                     val dyTotal = h.dragStartY - event.y
 
