@@ -13,9 +13,13 @@
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+<<<<<<< HEAD
         app:use_controller="false"
         android:clickable="false"
         android:focusable="false"
+=======
+        app:use_controller="true"
+>>>>>>> main
         app:resize_mode="fit" />
 
     <!-- 1b. Overlay de attenuire (dim) pt luminozitate: fallback vizibil cand
@@ -198,6 +202,7 @@
         android:scaleType="fitCenter"
         android:contentDescription="Înainte"
         android:src="@android:drawable/ic_media_ff" />
+<<<<<<< HEAD
 
     <!-- ============================================================
          GESTURE INTERCEPT + OVERLAY-URI NEON (design #08080A / #FF2A3D)
@@ -293,4 +298,6 @@
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
+=======
+>>>>>>> main
 </FrameLayout>

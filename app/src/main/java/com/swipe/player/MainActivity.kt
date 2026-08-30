@@ -14,9 +14,12 @@ import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.app.PictureInPictureParams
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -68,6 +71,22 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var seekStepCurent: Int = 10 // secunde de derulare per swipe/buton (2..30)
     private var backgroundPlayCurent: Boolean = false // redare în fundal (oprestea sunetului la blocare/iesire)
     private var autoOrderCurent: Boolean = true // autoplay continuu către următorul videoclip
+    // --- Gesture controls (brightness / volume / seek) ---
+    private enum class GestureMode { NONE, BRIGHTNESS, VOLUME, SEEK }
+    private var gestureMode: GestureMode = GestureMode.NONE
+    private var gestureStartX: Float = 0f
+    private var gestureStartY: Float = 0f
+    private var gestureStartBrightness: Float = 1f
+    private var gestureStartVolume: Float = 1f
+    private var gestureStartPositionMs: Long = 0L
+    private var lastHapticBucket: Int = -1
+    private lateinit var rootContainer: View
+    private var brightnessOverlay: View? = null
+    private var volumeOverlay: View? = null
+    private var seekOverlay: View? = null
+    private var brightnessProgress: ProgressBar? = null
+    private var volumeProgress: ProgressBar? = null
+    private var seekText: TextView? = null
     // Vizibilitatea butoanelor de control și a listelor de redare (controlate din Setări)
     private var ctrlVideoVizibil: Boolean = true  // video: play/pause + ⏪/⏩
     private var ctrlPhotoVizibil: Boolean = true  // poze: lumină/volum + butoanele
@@ -167,6 +186,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         photoFavBtn = findViewById(R.id.photoFavBtn)
         photoBrightnessSeek = findViewById(R.id.photoBrightnessSeek)
         photoVolumeSeek = findViewById(R.id.photoVolumeSeek)
+        // Gesture overlays + container
+        rootContainer = findViewById(R.id.rootContainer)
+        brightnessOverlay = findViewById(R.id.brightnessOverlay)
+        volumeOverlay = findViewById(R.id.volumeOverlay)
+        seekOverlay = findViewById(R.id.seekOverlay)
+        brightnessProgress = findViewById(R.id.brightnessProgress)
+        volumeProgress = findViewById(R.id.volumeProgress)
+        seekText = findViewById(R.id.seekText)
+        configureazaGestureControls()
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         // miniaturi (navigare rapidă prin poze)
@@ -753,7 +781,105 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
     }
 
-    override fun onPause() {
+    // ==================== GESTURE CONTROLS ====================
+    /**
+     * Configurează OnTouchListener pe rootContainer:
+     *  - 33% stânga   → drag vertical = luminozitate
+     *  - 33% dreapta  → drag vertical = volum
+     *  - 34% centru   → drag orizontal = seek
+     * Haptic feedback la ACTION_DOWN și la fiecare prag de 10%.
+     */
+    private fun configureazaGestureControls() {
+        rootContainer.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    gestureStartX = event.x
+                    gestureStartY = event.y
+                    gestureStartBrightness = luminozitateCurenta
+                    gestureStartVolume = volumCurent
+                    gestureStartPositionMs = try {
+                        adapter?.playerActiv?.currentPosition ?: 0L
+                    } catch (e: Exception) { 0L }
+                    lastHapticBucket = -1
+                    val w = rootContainer.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+                    gestureMode = when {
+                        event.x < w * 0.33f -> GestureMode.BRIGHTNESS
+                        event.x > w * 0.67f -> GestureMode.VOLUME
+                        else -> GestureMode.SEEK
+                    }
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dy = gestureStartY - event.y   // pozitiv = swipe în sus
+                    val dx = event.x - gestureStartX   // pozitiv = swipe la dreapta
+                    when (gestureMode) {
+                        GestureMode.BRIGHTNESS -> {
+                            val noua = (gestureStartBrightness + dy * 0.002f).coerceIn(0.15f, 1f)
+                            onBrightnessChange(noua)
+                            val procent = (noua * 100).toInt()
+                            brightnessProgress?.progress = procent
+                            brightnessOverlay?.visibility = View.VISIBLE
+                            volumeOverlay?.visibility = View.GONE
+                            seekOverlay?.visibility = View.GONE
+                            hapticLaPrag(procent, v)
+                        }
+                        GestureMode.VOLUME -> {
+                            val noua = (gestureStartVolume + dy * 0.002f).coerceIn(0f, 1f)
+                            onVolumeChange(noua)
+                            val procent = (noua * 100).toInt()
+                            volumeProgress?.progress = procent
+                            volumeOverlay?.visibility = View.VISIBLE
+                            brightnessOverlay?.visibility = View.GONE
+                            seekOverlay?.visibility = View.GONE
+                            hapticLaPrag(procent, v)
+                        }
+                        GestureMode.SEEK -> {
+                            val deltaMs = (dx * 0.3 * 1000L).toLong()  // 0.3 px→factor, *1000 ms
+                            val tinta = gestureStartPositionMs + deltaMs
+                            val dur = try { adapter?.playerActiv?.duration ?: 0L } catch (e: Exception) { 0L }
+                            val clamped = if (dur > 0) tinta.coerceIn(0L, dur) else tinta.coerceAtLeast(0L)
+                            try { adapter?.playerActiv?.seekTo(clamped) } catch (e: Exception) { Log.w(TAG, "seek gesture", e) }
+                            val secDelta = deltaMs / 1000
+                            seekText?.text = if (secDelta >= 0) "+${secDelta}s" else "${secDelta}s"
+                            seekOverlay?.visibility = View.VISIBLE
+                            brightnessOverlay?.visibility = View.GONE
+                            volumeOverlay?.visibility = View.GONE
+                            val bucket = (kotlin.math.abs(secDelta) / 10).toInt()
+                            if (bucket != lastHapticBucket) {
+                                lastHapticBucket = bucket
+                                v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                        }
+                        GestureMode.NONE -> {}
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    brightnessOverlay?.visibility = View.GONE
+                    volumeOverlay?.visibility = View.GONE
+                    seekOverlay?.visibility = View.GONE
+                    gestureMode = GestureMode.NONE
+                    lastHapticBucket = -1
+                    v.performClick()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    /** Haptic feedback de fiecare dată când procentul trece un multiplu de 10. */
+    private fun hapticLaPrag(procent: Int, v: View) {
+        val bucket = procent / 10
+        if (bucket != lastHapticBucket) {
+            lastHapticBucket = bucket
+            v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+    }
+    // ================== SFÂRȘIT GESTURE CONTROLS ==================
+
+override fun onPause() {
         super.onPause()
         // Dacă suntem în Picture-in-Picture, NU oprim redarea și NU pornim serviciul:
         // activitatea e încă vizibilă în fereastra mică, deci playerul continuă normal.
