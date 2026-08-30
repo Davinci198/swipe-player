@@ -335,6 +335,7 @@ class VideoPagerAdapter(
         var dragStartVal = 0f
         var dragStartPosMs = 0L
         var seekActive = false
+        var seekTargetMs = -1L // poziția țintă în timpul drag-ului de seek (seek real doar la UP)
         val dragThreshold = 8f // prag activare gest orizontal (px) pentru seek (mai sensibil)
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
@@ -477,6 +478,7 @@ class VideoPagerAdapter(
                     h.dragStartY = event.y
                     h.dragStartPosMs = player.currentPosition
                     h.seekActive = false
+                    h.seekTargetMs = -1L
                     val w = view.width.toFloat().coerceAtLeast(1f)
                     h.dragMod = when {
                         event.x < w * 0.33f -> 2 // BRIGHTNESS (stânga)
@@ -527,13 +529,14 @@ class VideoPagerAdapter(
                             }
                             true
                         }
-                        3 -> { // SEEK: dx * 0.3 ms/px adunat la poziția de start (ca în demo)
+                        3 -> { // SEEK: preview fluid la MOVE (fără seekTo); seek REAL doar la UP
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
                                 val deltaMs = ((event.x - h.dragStartX) * 0.3f).toLong()
                                 val target = (h.dragStartPosMs + deltaMs).coerceIn(0L, durata)
-                                player.seekTo(target)
-                                showSeekIndicator(h, target, durata)
+                                h.seekTargetMs = target // rețin ținta; NU seek aici (rebuffer lent la fiecare move)
+                                h.seekActive = true
+                                showSeekIndicator(h, target, durata) // doar preview UI fluid
                             }
                             true
                         }
@@ -541,6 +544,11 @@ class VideoPagerAdapter(
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // seek REAL o singură dată, la ridicarea degetului (nu la fiecare move)
+                    if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
+                        player.seekTo(h.seekTargetMs)
+                        h.seekTargetMs = -1L
+                    }
                     // ascunde overlay-urile cu un mic delay (spring-like), ca în demo
                     view.postDelayed({ hideIndicators(h) }, 800)
                     h.dragMod = 0
