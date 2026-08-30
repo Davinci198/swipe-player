@@ -312,6 +312,10 @@ class VideoPagerAdapter(
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
         val btnSeekBack: ImageButton = view.findViewById(R.id.btnSeekBack)
         val btnSeekFwd: ImageButton = view.findViewById(R.id.btnSeekFwd)
+        val btnBrightnessUp: ImageButton = view.findViewById(R.id.btnBrightnessUp)
+        val btnBrightnessDown: ImageButton = view.findViewById(R.id.btnBrightnessDown)
+        val btnVolumeUp: ImageButton = view.findViewById(R.id.btnVolumeUp)
+        val btnVolumeDown: ImageButton = view.findViewById(R.id.btnVolumeDown)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
         val brightnessIndicator: FrameLayout = view.findViewById(R.id.brightnessIndicator)
         val brightnessFill: View = view.findViewById(R.id.brightnessFill)
@@ -390,12 +394,16 @@ class VideoPagerAdapter(
             playerActiv = player
         }
 
-        // Ascunde butoanele ⏪/⏩ automat, când controllerul dispare după timeout
+        // Ascunde butoanele ⏪/⏩/luminozitate/volum automat, când controllerul dispare după timeout
         // (nu le ținem mereu pe ecran; apar doar cu controllerul la atingere).
         val hideButtons = Runnable {
             if (holder.controllerVisibil) {
                 holder.btnSeekBack.visibility = View.GONE
                 holder.btnSeekFwd.visibility = View.GONE
+                holder.btnBrightnessUp.visibility = View.GONE
+                holder.btnBrightnessDown.visibility = View.GONE
+                holder.btnVolumeUp.visibility = View.GONE
+                holder.btnVolumeDown.visibility = View.GONE
                 holder.dragMod = 0
             }
         }
@@ -425,6 +433,10 @@ class VideoPagerAdapter(
                         holder.playerView.showController()
                         holder.btnSeekBack.visibility = View.VISIBLE
                         holder.btnSeekFwd.visibility = View.VISIBLE
+                        holder.btnBrightnessUp.visibility = View.VISIBLE
+                        holder.btnBrightnessDown.visibility = View.VISIBLE
+                        holder.btnVolumeUp.visibility = View.VISIBLE
+                        holder.btnVolumeDown.visibility = View.VISIBLE
                         // butoanele dispar automat împreună cu controllerul (după timeout)
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.itemView.postDelayed(hideButtons, CTRL_TIMEOUT_MS)
@@ -433,6 +445,10 @@ class VideoPagerAdapter(
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.btnSeekBack.visibility = View.GONE
                         holder.btnSeekFwd.visibility = View.GONE
+                        holder.btnBrightnessUp.visibility = View.GONE
+                        holder.btnBrightnessDown.visibility = View.GONE
+                        holder.btnVolumeUp.visibility = View.GONE
+                        holder.btnVolumeDown.visibility = View.GONE
                     }
                     holder.controllerVisibil = noul
                     return true
@@ -605,6 +621,11 @@ class VideoPagerAdapter(
         val secMs = seekStepSec.coerceIn(2, 30) * 1000L
         holder.btnSeekBack.visibility = View.GONE
         holder.btnSeekFwd.visibility = View.GONE
+        holder.btnBrightnessUp.visibility = View.GONE
+        holder.btnBrightnessDown.visibility = View.GONE
+        holder.btnVolumeUp.visibility = View.GONE
+        holder.btnVolumeDown.visibility = View.GONE
+
         holder.btnSeekBack.setOnClickListener {
             val d = player.duration.coerceAtLeast(0L)
             val target = (player.currentPosition - secMs).coerceIn(0L, d)
@@ -616,6 +637,42 @@ class VideoPagerAdapter(
             val target = (player.currentPosition + secMs).coerceIn(0L, d)
             player.seekTo(target)
             if (d > 0) showSeekIndicator(holder, target, d)
+        }
+
+        // Butoane pentru lumină
+        holder.btnBrightnessUp.setOnClickListener {
+            currentBrightness = (currentBrightness + 0.05f).coerceIn(0.01f, 1f)
+            aplicaDim(holder, currentBrightness)
+            onBrightnessChange?.invoke(currentBrightness)
+            showVerticalIndicator(holder, 2, currentBrightness)
+        }
+        holder.btnBrightnessDown.setOnClickListener {
+            currentBrightness = (currentBrightness - 0.05f).coerceIn(0.01f, 1f)
+            aplicaDim(holder, currentBrightness)
+            onBrightnessChange?.invoke(currentBrightness)
+            showVerticalIndicator(holder, 2, currentBrightness)
+        }
+
+        // Butoane pentru volum
+        holder.btnVolumeUp.setOnClickListener {
+            val am = audioManager()
+            am?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, 0)
+            val maxVol = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+            val curVol = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+            currentVolume = if (maxVol > 0) curVol.toFloat() / maxVol else currentVolume
+            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
+            onVolumeChange?.invoke(currentVolume)
+            showVerticalIndicator(holder, 1, currentVolume)
+        }
+        holder.btnVolumeDown.setOnClickListener {
+            val am = audioManager()
+            am?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, 0)
+            val maxVol = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+            val curVol = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+            currentVolume = if (maxVol > 0) curVol.toFloat() / maxVol else currentVolume
+            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
+            onVolumeChange?.invoke(currentVolume)
+            showVerticalIndicator(holder, 1, currentVolume)
         }
 
     }
