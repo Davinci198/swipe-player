@@ -83,10 +83,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private lateinit var rootContainer: View
     private var brightnessOverlay: View? = null
     private var volumeOverlay: View? = null
-    private var seekOverlay: View? = null
     private var brightnessProgress: ProgressBar? = null
     private var volumeProgress: ProgressBar? = null
-    private var seekText: TextView? = null
     // Vizibilitatea butoanelor de control și a listelor de redare (controlate din Setări)
     private var ctrlVideoVizibil: Boolean = true  // video: play/pause + ⏪/⏩
     private var ctrlPhotoVizibil: Boolean = true  // poze: lumină/volum + butoanele
@@ -190,10 +188,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         rootContainer = findViewById(R.id.rootContainer)
         brightnessOverlay = findViewById(R.id.brightnessOverlay)
         volumeOverlay = findViewById(R.id.volumeOverlay)
-        seekOverlay = findViewById(R.id.seekOverlay)
         brightnessProgress = findViewById(R.id.brightnessProgress)
         volumeProgress = findViewById(R.id.volumeProgress)
-        seekText = findViewById(R.id.seekText)
         configureazaGestureControls()
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -819,7 +815,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                             brightnessProgress?.progress = procent
                             brightnessOverlay?.visibility = View.VISIBLE
                             volumeOverlay?.visibility = View.GONE
-                            seekOverlay?.visibility = View.GONE
                             hapticLaPrag(procent, v)
                         }
                         GestureMode.VOLUME -> {
@@ -829,7 +824,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                             volumeProgress?.progress = procent
                             volumeOverlay?.visibility = View.VISIBLE
                             brightnessOverlay?.visibility = View.GONE
-                            seekOverlay?.visibility = View.GONE
                             hapticLaPrag(procent, v)
                         }
                         GestureMode.SEEK -> {
@@ -839,8 +833,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                             val clamped = if (dur > 0) tinta.coerceIn(0L, dur) else tinta.coerceAtLeast(0L)
                             try { adapter?.playerActiv?.seekTo(clamped) } catch (e: Exception) { Log.w(TAG, "seek gesture", e) }
                             val secDelta = deltaMs / 1000
-                            seekText?.text = if (secDelta >= 0) "+${secDelta}s" else "${secDelta}s"
-                            seekOverlay?.visibility = View.VISIBLE
                             brightnessOverlay?.visibility = View.GONE
                             volumeOverlay?.visibility = View.GONE
                             val bucket = (kotlin.math.abs(secDelta) / 10).toInt()
@@ -856,7 +848,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     brightnessOverlay?.visibility = View.GONE
                     volumeOverlay?.visibility = View.GONE
-                    seekOverlay?.visibility = View.GONE
                     gestureMode = GestureMode.NONE
                     lastHapticBucket = -1
                     v.performClick()
