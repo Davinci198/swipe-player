@@ -312,10 +312,6 @@ class VideoPagerAdapter(
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
         val btnSeekBack: ImageButton = view.findViewById(R.id.btnSeekBack)
         val btnSeekFwd: ImageButton = view.findViewById(R.id.btnSeekFwd)
-        val btnBrightnessUp: ImageButton = view.findViewById(R.id.btnBrightnessUp)
-        val btnBrightnessDown: ImageButton = view.findViewById(R.id.btnBrightnessDown)
-        val btnVolumeUp: ImageButton = view.findViewById(R.id.btnVolumeUp)
-        val btnVolumeDown: ImageButton = view.findViewById(R.id.btnVolumeDown)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
         val brightnessIndicator: FrameLayout = view.findViewById(R.id.brightnessIndicator)
         val brightnessFill: View = view.findViewById(R.id.brightnessFill)
@@ -324,14 +320,6 @@ class VideoPagerAdapter(
         val seekIndicator: LinearLayout = view.findViewById(R.id.seekIndicator)
         val seekTime: TextView = view.findViewById(R.id.seekTime)
         val seekProgress: android.widget.ProgressBar = view.findViewById(R.id.seekProgress)
-        // Overlay-uri NEON noi (design #08080A / #FF2A3D) + stratul de intercept
-        val touchIntercept: View = view.findViewById(R.id.touchIntercept)
-        val brightnessOverlay: View = view.findViewById(R.id.brightnessOverlay)
-        val volumeOverlay: View = view.findViewById(R.id.volumeOverlay)
-        val brightnessProgressBar: android.widget.ProgressBar = view.findViewById(R.id.brightnessProgress)
-        val volumeProgressBar: android.widget.ProgressBar = view.findViewById(R.id.volumeProgress)
-        val brightnessPct: TextView = view.findViewById(R.id.brightnessPct)
-        val volumePct: TextView = view.findViewById(R.id.volumePct)
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
         var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
@@ -341,7 +329,6 @@ class VideoPagerAdapter(
         var dragStartVal = 0f
         var dragStartPosMs = 0L
         var seekActive = false
-        var seekTargetMs = -1L // poziția țintă în timpul drag-ului de seek (seek real doar la UP)
         val dragThreshold = 8f // prag activare gest orizontal (px) pentru seek (mai sensibil)
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
@@ -394,16 +381,12 @@ class VideoPagerAdapter(
             playerActiv = player
         }
 
-        // Ascunde butoanele ⏪/⏩/luminozitate/volum automat, când controllerul dispare după timeout
+        // Ascunde butoanele ⏪/⏩ automat, când controllerul dispare după timeout
         // (nu le ținem mereu pe ecran; apar doar cu controllerul la atingere).
         val hideButtons = Runnable {
             if (holder.controllerVisibil) {
                 holder.btnSeekBack.visibility = View.GONE
                 holder.btnSeekFwd.visibility = View.GONE
-                holder.btnBrightnessUp.visibility = View.GONE
-                holder.btnBrightnessDown.visibility = View.GONE
-                holder.btnVolumeUp.visibility = View.GONE
-                holder.btnVolumeDown.visibility = View.GONE
                 holder.dragMod = 0
             }
         }
@@ -433,10 +416,6 @@ class VideoPagerAdapter(
                         holder.playerView.showController()
                         holder.btnSeekBack.visibility = View.VISIBLE
                         holder.btnSeekFwd.visibility = View.VISIBLE
-                        holder.btnBrightnessUp.visibility = View.VISIBLE
-                        holder.btnBrightnessDown.visibility = View.VISIBLE
-                        holder.btnVolumeUp.visibility = View.VISIBLE
-                        holder.btnVolumeDown.visibility = View.VISIBLE
                         // butoanele dispar automat împreună cu controllerul (după timeout)
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.itemView.postDelayed(hideButtons, CTRL_TIMEOUT_MS)
@@ -445,10 +424,6 @@ class VideoPagerAdapter(
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.btnSeekBack.visibility = View.GONE
                         holder.btnSeekFwd.visibility = View.GONE
-                        holder.btnBrightnessUp.visibility = View.GONE
-                        holder.btnBrightnessDown.visibility = View.GONE
-                        holder.btnVolumeUp.visibility = View.GONE
-                        holder.btnVolumeDown.visibility = View.GONE
                     }
                     holder.controllerVisibil = noul
                     return true
@@ -466,7 +441,7 @@ class VideoPagerAdapter(
         val h = holder // referință locală pentru readabilitate
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
-        h.touchIntercept.setOnTouchListener { view, event ->
+        h.touchCatcher.setOnTouchListener { view, event ->
             // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating).
             // Chiar și după ce ridici un deget (pointerCount=1) rămânem în modul pinch până
             // la ACTION_UP, ca să NU se combine cu luminozitatea/volumul (bug „zip" final).
@@ -490,120 +465,124 @@ class VideoPagerAdapter(
 
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    h.dragMod = 0
+                    h.seekActive = false
                     h.dragStartX = event.x
                     h.dragStartY = event.y
+                    // decizie la DOWN, pe baza zonei unde începe atingerea:
+                    val w = view.width.toFloat().coerceAtLeast(1f)
+                    // zone late: stânga 1/3 = luminozitate, dreapta 1/3 = volum,
+                    // mijloc 1/3 = scroll vertical (schimbă videoclipul) / seek orizontal
+                    // inset de siguranță de 4% din fiecare extremă => evită gesturile de
+                    // navigare de sistem (Motorola edge swipe) care pot fura evenimentul
+                    val inset = w * 0.04f
+                    val zStanga = w * 0.33f
+                    val zDreapta = w * 0.67f
+                    h.dragZona = when {
+                        event.x in inset..zStanga -> 1 // stânga => lumină
+                        event.x in zDreapta..(w - inset) -> 2 // dreapta => volum
+                        else -> 0 // mijloc => scroll/seek (sau extremă, lăsat systemului)
+                    }
+                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} zona=${h.dragZona} ${if (h.dragZona==1) "BRIGHT zone" else if (h.dragZona==2) "VOL zone" else "MID/SCROLL"}")
+                    // valoarea de pornire = valoarea curenta (nu un pixel!)
+                    h.dragStartVal = when (h.dragZona) {
+                        1 -> currentBrightness // stanga = lumina
+                        2 -> currentVolume     // dreapta = volum
+                        else -> 0f
+                    }
                     h.dragStartPosMs = player.currentPosition
-                    h.seekActive = false
-                    h.seekTargetMs = -1L
-                    h.dragMod = 0
-                    h.dragZona = 0
-                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} y=${"%.0f".format(event.y)}")
-                    // NU blocăm încă — așteptăm să vedem direcția
+                    if (h.dragZona != 0) {
+                        // blochez scroll-ul ViewPager imediat => lumina/volumul pornesc garantat
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.x - h.dragStartX
-                    val dy = event.y - h.dragStartY
-                    val adx = kotlin.math.abs(dx)
-                    val ady = kotlin.math.abs(dy)
-
-                    // Prima decizie: pe baza direcției dominante
-                    if (h.dragMod == 0) {
-                        val touchSlop = 8f * view.context.resources.displayMetrics.density // 8dp
-                        if (adx > touchSlop || ady > touchSlop) {
-                            // BLOCHEAZĂ TOT LANȚUL DE PĂRINȚI — asta e criteriul lipsă
-                            var p = view.parent
-                            while (p != null) {
-                                p.requestDisallowInterceptTouchEvent(true)
-                                p = p.parent
-                            }
-
-                            h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
-                            when (h.dragMod) {
-                                2 -> showVerticalIndicator(h, 2, currentBrightness)
-                                1 -> showVerticalIndicator(h, 1, currentVolume)
-                                3 -> {
-                                    val d = player.duration.coerceAtLeast(0L)
-                                    if (d > 0) showSeekIndicator(h, player.currentPosition, d)
-                                    h.dragStartPosMs = player.currentPosition
+                    when (h.dragMod) {
+                        // încă nedecis: stabilim direcția gestului (după prag mic)
+                        0 -> {
+                            val dx = event.x - h.dragStartX
+                            val dy = event.y - h.dragStartY
+                            val adx = kotlin.math.abs(dx)
+                            val ady = kotlin.math.abs(dy)
+                            // mijloc: tratăm ca SEEK orice mișcare clar orizontală, chiar
+                            // și ușor diagonală (adx >= ady*0.55), ca să pornească ușor.
+                            // Doar mișcările puternic verticale rămân scroll pe ViewPager.
+                            val orizontal = adx >= ady * 0.55f
+                            if (h.dragZona == 0) {
+                                // mijloc: orizontal -> seek, vertical -> scroll ViewPager
+                                if (orizontal) {
+                                    if (adx < h.dragThreshold) return@setOnTouchListener true
+                                    h.dragMod = 3 // seek
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
+                                } else {
+                                    // lasă ViewPager2 să facă scroll-ul vertical (nu cerem disallow)
+                                    h.dragMod = 4
+                                    return@setOnTouchListener false
+                                }
+                            } else {
+                                // margine: vertical -> lumina/volum, orizontal -> seek
+                                if (orizontal) {
+                                    if (kotlin.math.abs(dx) < h.dragThreshold) return@setOnTouchListener true
+                                    h.dragMod = 3
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
+                                } else {
+                                    if (kotlin.math.abs(dy) < 4f) return@setOnTouchListener true
+                                    // stanga(1)=luminozitate(dragMod 2), dreapta(2)=volum(dragMod 1)
+                                    h.dragMod = if (h.dragZona == 1) 2 else 1
+                                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    true
                                 }
                             }
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                         }
-                        return@setOnTouchListener true
-                    }
-
-                    // RECONFIRMĂ disallow la FIECARE MOVE cât timp suntem în seek
-                    // Altfel ViewPager2 recapătă controlul între MOVE-uri
-                    if (h.dragMod == 3) {
-                        var p = view.parent
-                        while (p != null) {
-                            p.requestDisallowInterceptTouchEvent(true)
-                            p = p.parent
-                        }
-                    }
-
-                    when (h.dragMod) {
-                        2 -> { // BRIGHTNESS: dy * 0.002f adunat incremental (ca în demo)
-                            currentBrightness = (currentBrightness + dy * 0.002f).coerceIn(0.01f, 1f)
-                            h.dragStartY = event.y // delta incremental
+                        2 -> { // luminozitate (margine stânga)
+                            val dy = h.dragStartY - event.y
+                            Log.d("GESTURE", "BRIGHT MOVE dy=${"%.0f".format(dy)} dragMod=2")
+                            val delta = dy / (view.height.toFloat() * 1.6f)
+                            currentBrightness = (h.dragStartVal + delta).coerceIn(0.15f, 1f)
                             onBrightnessChange?.invoke(currentBrightness)
+                            // fallback vizibil când window.screenBrightness e blocat (Motorola)
                             aplicaDim(h, currentBrightness)
+                            // indicator vizual (bară stânga)
                             showVerticalIndicator(h, 2, currentBrightness)
-                            true
+                            return@setOnTouchListener true
                         }
-                        1 -> { // VOLUME: trepte sistem cu prag (ca în demo, fără flooding)
-                            if (kotlin.math.abs(dy) >= 8f * view.context.resources.displayMetrics.density) {
-                                val am = audioManager()
-                                am?.adjustStreamVolume(
-                                    AudioManager.STREAM_MUSIC,
-                                    if (dy > 0) AudioManager.ADJUST_LOWER else AudioManager.ADJUST_RAISE,
-                                    0
-                                )
-                                val max = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-                                val cur = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-                                currentVolume = if (max > 0) cur.toFloat() / max else currentVolume
-                                playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
-                                onVolumeChange?.invoke(currentVolume)
-                                showVerticalIndicator(h, 1, currentVolume)
-                                h.dragStartY = event.y // reset prag
-                            }
-                            true
+                        1 -> { // volum (margine dreapta)
+                            val delta = (h.dragStartY - event.y) / (view.height.toFloat() * 1.6f)
+                            currentVolume = (h.dragStartVal + delta).coerceIn(0f, 1f)
+                            // setează volumul sistemului (STREAM_MUSIC) + câștig player
+                            aplicaVolumSistem(currentVolume)
+                            onVolumeChange?.invoke(currentVolume)
+                            // indicator vizual (bară dreapta)
+                            showVerticalIndicator(h, 1, currentVolume)
+                            return@setOnTouchListener true
                         }
-                        3 -> { // SEEK: preview la fiecare MOVE; seek REAL doar la UP
+                        3 -> { // seek orizontal, pași de N secunde (configurabil din Setări)
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                // Folosim dx proaspăt (ca în demo) — poziție relativă la start-ul gestului
-                                val percent = dx / view.width // -1..1
-                                val seekDelta = (percent * 90_000).toLong() // max ±90 sec
-                                val target = (h.dragStartPosMs + seekDelta).coerceIn(0L, durata)
-                                h.seekTargetMs = target
-                                h.seekActive = true
-                                showSeekIndicator(h, target, durata)
+                                val pas = ((event.x - h.dragStartX) / 15f).toInt()
+                                val secMs = seekStepSec.coerceIn(2, 30) * 1000L
+                                val target = h.dragStartPosMs + pas * secMs
+                                player.seekTo(target.coerceIn(0L, durata))
+                                // indicator vizual (bară jos + timp)
+                                showSeekIndicator(h, target.coerceIn(0L, durata), durata)
                             }
-                            true
+                            return@setOnTouchListener true
                         }
-                        else -> true
+                        4 -> return@setOnTouchListener false // scroll vertical (mijloc)
                     }
+                    true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    // ELIBEREAZĂ TOT LANȚUL DE PĂRINȚI
-                    var p = view.parent
-                    while (p != null) {
-                        p.requestDisallowInterceptTouchEvent(false)
-                        p = p.parent
-                    }
-                    // seek REAL o singură dată, la ridicarea degetului
-                    if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
-                        player.seekTo(h.seekTargetMs)
-                        h.seekTargetMs = -1L
-                    }
-                    // ascunde overlay-urile cu un mic delay (spring-like), ca în demo
-                    view.postDelayed({ hideIndicators(h) }, 800)
+                    hideIndicators(h)
+                    val eraScroll = h.dragMod == 4
                     h.dragMod = 0
                     h.dragZona = 0
                     h.seekActive = false
-                    true
+                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                    if (eraScroll) false else true
                 }
                 else -> true
             }
@@ -621,11 +600,6 @@ class VideoPagerAdapter(
         val secMs = seekStepSec.coerceIn(2, 30) * 1000L
         holder.btnSeekBack.visibility = View.GONE
         holder.btnSeekFwd.visibility = View.GONE
-        holder.btnBrightnessUp.visibility = View.GONE
-        holder.btnBrightnessDown.visibility = View.GONE
-        holder.btnVolumeUp.visibility = View.GONE
-        holder.btnVolumeDown.visibility = View.GONE
-
         holder.btnSeekBack.setOnClickListener {
             val d = player.duration.coerceAtLeast(0L)
             val target = (player.currentPosition - secMs).coerceIn(0L, d)
@@ -637,42 +611,6 @@ class VideoPagerAdapter(
             val target = (player.currentPosition + secMs).coerceIn(0L, d)
             player.seekTo(target)
             if (d > 0) showSeekIndicator(holder, target, d)
-        }
-
-        // Butoane pentru lumină
-        holder.btnBrightnessUp.setOnClickListener {
-            currentBrightness = (currentBrightness + 0.05f).coerceIn(0.01f, 1f)
-            aplicaDim(holder, currentBrightness)
-            onBrightnessChange?.invoke(currentBrightness)
-            showVerticalIndicator(holder, 2, currentBrightness)
-        }
-        holder.btnBrightnessDown.setOnClickListener {
-            currentBrightness = (currentBrightness - 0.05f).coerceIn(0.01f, 1f)
-            aplicaDim(holder, currentBrightness)
-            onBrightnessChange?.invoke(currentBrightness)
-            showVerticalIndicator(holder, 2, currentBrightness)
-        }
-
-        // Butoane pentru volum
-        holder.btnVolumeUp.setOnClickListener {
-            val am = audioManager()
-            am?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, 0)
-            val maxVol = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-            val curVol = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-            currentVolume = if (maxVol > 0) curVol.toFloat() / maxVol else currentVolume
-            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
-            onVolumeChange?.invoke(currentVolume)
-            showVerticalIndicator(holder, 1, currentVolume)
-        }
-        holder.btnVolumeDown.setOnClickListener {
-            val am = audioManager()
-            am?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, 0)
-            val maxVol = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-            val curVol = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-            currentVolume = if (maxVol > 0) curVol.toFloat() / maxVol else currentVolume
-            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
-            onVolumeChange?.invoke(currentVolume)
-            showVerticalIndicator(holder, 1, currentVolume)
         }
 
     }
@@ -792,20 +730,14 @@ class VideoPagerAdapter(
     }
     private fun showVerticalIndicator(holder: VH?, kind: Int, level: Float) {
         holder ?: return
-        holder.brightnessOverlay.bringToFront()
-        holder.volumeOverlay.bringToFront()
-        if (kind == 2) { // luminozitate (stânga) -> overlay NEON stânga
-            holder.brightnessOverlay.visibility = View.VISIBLE
-            val pct = (level.coerceIn(0f, 1f) * 100).toInt()
-            holder.brightnessProgressBar.progress = pct
-            holder.brightnessPct.text = "$pct%"
-            holder.volumeOverlay.visibility = View.GONE
-        } else if (kind == 1) { // volum (dreapta) -> overlay NEON dreapta
-            holder.volumeOverlay.visibility = View.VISIBLE
-            val pct = (level.coerceIn(0f, 1f) * 100).toInt()
-            holder.volumeProgressBar.progress = pct
-            holder.volumePct.text = "$pct%"
-            holder.brightnessOverlay.visibility = View.GONE
+        if (kind == 2) { // luminozitate (stânga)
+            holder.brightnessIndicator.visibility = View.VISIBLE
+            setVerticalFill(holder.brightnessFill, level)
+            holder.volumeIndicator.visibility = View.GONE
+        } else if (kind == 1) { // volum (dreapta)
+            holder.volumeIndicator.visibility = View.VISIBLE
+            setVerticalFill(holder.volumeFill, level)
+            holder.brightnessIndicator.visibility = View.GONE
         }
     }
     private fun showSeekIndicator(holder: VH?, posMs: Long, durMs: Long) {
@@ -820,9 +752,6 @@ class VideoPagerAdapter(
         holder.brightnessIndicator.visibility = View.GONE
         holder.volumeIndicator.visibility = View.GONE
         holder.seekIndicator.visibility = View.GONE
-        // ascund și overlay-urile NEON noi
-        holder.brightnessOverlay.visibility = View.GONE
-        holder.volumeOverlay.visibility = View.GONE
     }
     private fun fmtTimp(ms: Long): String {
         val s = (ms / 1000).coerceAtLeast(0)

@@ -296,8 +296,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         setMod("video")
         // reia de unde ai rămas (mod + poziție) — rezolvă „după închidere nu mai merge”
         restaureazaStareSesiune()
-        // Gesture-urile (luminozitate/volum/seek) sunt gestionate per-pagină de
-        // VideoPagerAdapter prin stratul touchIntercept din item_video.xml.
     }
 
     /** comută între modul de videoclipuri și galeria de poze (ambele cu swipe vertical) */
