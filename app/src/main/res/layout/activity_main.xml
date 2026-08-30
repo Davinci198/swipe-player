@@ -207,123 +207,93 @@
         android:alpha="0.92"
         android:visibility="gone" />
 
-    <!-- ====== Overlay NEON (design nou) ====== -->
-
-    <!-- Overlay stanga BRIGHTNESS -->
+<!-- ====== Overlay NEON (design nou) ====== -->
+    <!-- Overlay stanga BRIGHTNESS: 52dp x 160dp, glass #08080A 85%, ProgressBar vertical -->
     <FrameLayout
         android:id="@+id/brightnessOverlay"
-        android:layout_width="120dp"
+        android:layout_width="52dp"
         android:layout_height="160dp"
         android:layout_gravity="center_vertical|start"
         android:layout_marginStart="24dp"
         android:background="@drawable/bg_glass_neon"
         android:visibility="gone"
         android:elevation="20dp">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="12dp">
-
+            android:padding="8dp">
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/ic_brightness"
                 android:tint="#FF2A3D" />
-
+            <!-- ProgressBar vertical: width=inaltimea vizuala, height=grosimea, rotat -90 -->
             <ProgressBar
                 android:id="@+id/brightnessProgress"
                 style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="4dp"
                 android:layout_marginTop="12dp"
+                android:rotation="-90"
                 android:max="100"
                 android:progress="50"
-                android:progressTint="#FF2A3D"
-                android:progressBackgroundTint="#FFFFFF14" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="BRIGHTNESS"
-                android:textColor="#FFFFFF60"
-                android:textSize="9sp"
-                android:letterSpacing="0.15" />
+                android:progressDrawable="@drawable/neon_progress_ff2a3d" />
         </LinearLayout>
     </FrameLayout>
-
-    <!-- Overlay dreapta VOLUME -->
+    <!-- Overlay dreapta VOLUME: 52dp x 160dp -->
     <FrameLayout
         android:id="@+id/volumeOverlay"
-        android:layout_width="120dp"
+        android:layout_width="52dp"
         android:layout_height="160dp"
         android:layout_gravity="center_vertical|end"
         android:layout_marginEnd="24dp"
         android:background="@drawable/bg_glass_neon"
         android:visibility="gone"
         android:elevation="20dp">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="12dp">
-
+            android:padding="8dp">
             <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/ic_volume"
                 android:tint="#FF2A3D" />
-
             <ProgressBar
                 android:id="@+id/volumeProgress"
                 style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="80dp"
+                android:layout_width="120dp"
                 android:layout_height="4dp"
                 android:layout_marginTop="12dp"
+                android:rotation="-90"
                 android:max="100"
                 android:progress="50"
-                android:progressTint="#FF2A3D" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="VOLUME"
-                android:textColor="#FFFFFF60"
-                android:textSize="9sp" />
+                android:progressDrawable="@drawable/neon_progress_ff2a3d" />
         </LinearLayout>
     </FrameLayout>
-
-    <!-- Overlay centru SEEK + thumbnail preview -->
+    <!-- Overlay SEEK: jos, 44dp inaltime, background #0E0E10 -->
     <FrameLayout
         android:id="@+id/seekOverlay"
-        android:layout_width="200dp"
-        android:layout_height="120dp"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_glass_neon"
-        android:visibility="gone">
-
-        <FrameLayout
-            android:id="@+id/seekPreview"
-            android:layout_width="match_parent"
-            android:layout_height="80dp"
-            android:background="#0E0E10" />
-
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom"
+        android:background="#0E0E10"
+        android:visibility="gone"
+        android:elevation="20dp">
         <TextView
             android:id="@+id/seekText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="8dp"
+            android:layout_gravity="center"
             android:text="+10s"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:fontFamily="monospace" />
+    </FrameLayout>
     </FrameLayout>
 
     <!-- Timeline neon chapters -->

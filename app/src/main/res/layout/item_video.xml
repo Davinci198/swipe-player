@@ -13,7 +13,9 @@
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:use_controller="true"
+        app:use_controller="false"
+        android:clickable="false"
+        android:focusable="false"
         app:resize_mode="fit" />
 
     <!-- 1b. Overlay de attenuire (dim) pt luminozitate: fallback vizibil cand
