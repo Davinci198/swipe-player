@@ -294,7 +294,6 @@
             android:textSize="13sp"
             android:fontFamily="monospace" />
     </FrameLayout>
-    </FrameLayout>
 
     <!-- Timeline neon chapters -->
     <com.swipe.player.TimelineChaptersView
