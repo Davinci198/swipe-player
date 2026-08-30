@@ -3,158 +3,177 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#08080A">
+    android:background="#000000">
 
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:use_controller="false"
         app:resize_mode="fit"
-        app:use_controller="false" />
+        app:surface_type="texture_view"
+        app:shutter_background_color="#000000" />
 
-    <!-- Dim pentru brightness -->
     <View
         android:id="@+id/dimOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#000000"
-        android:alpha="0"
-        android:visibility="gone" />
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="invisible" />
 
-    <!-- Touch catcher - PRINDE toate gesturile -->
-    <View
-        android:id="@+id/touch_catcher"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- VIDEO NAME TOP -->
-    <TextView
-        android:id="@+id/tvVideoName"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:layout_margin="16dp"
-        android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:fontFamily="sans-serif-medium"
-        android:background="#33000000"
-        android:padding="6dp"
-        android:visibility="gone" />
-
-    <!-- FAVORITE -->
-    <ImageButton
-        android:id="@+id/btnFavorite"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_gravity="top|end"
-        android:layout_margin="12dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_favorite"
-        android:visibility="gone" />
-
-    <!-- ===== BRIGHTNESS INDICATOR - STANGA - NEON #FF2A3D ===== -->
-    <FrameLayout
-        android:id="@+id/brightnessIndicator"
-        android:layout_width="56dp"
-        android:layout_height="112dp"
-        android:layout_gravity="center_vertical|start"
-        android:layout_marginStart="24dp"
-        android:background="@drawable/overlay_neon_bg"
-        android:visibility="gone"
-        android:elevation="10dp">
-
-        <View
-            android:id="@+id/brightnessFill"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_gravity="bottom"
-            android:background="#FF2A3D" />
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_brightness"
-            android:tint="#FFFFFF" />
-    </FrameLayout>
-
-    <!-- ===== VOLUME INDICATOR - DREAPTA - NEON #FF2A3D ===== -->
-    <FrameLayout
-        android:id="@+id/volumeIndicator"
-        android:layout_width="56dp"
-        android:layout_height="112dp"
-        android:layout_gravity="center_vertical|end"
-        android:layout_marginEnd="24dp"
-        android:background="@drawable/overlay_neon_bg"
-        android:visibility="gone"
-        android:elevation="10dp">
-
-        <View
-            android:id="@+id/volumeFill"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_gravity="bottom"
-            android:background="#FF2A3D" />
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_volume"
-            android:tint="#FFFFFF" />
-    </FrameLayout>
-
-    <!-- ===== SEEK INDICATOR - CENTRU - NEON ===== -->
     <LinearLayout
-        android:id="@+id/seekIndicator"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
+        android:id="@+id/loadingContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="@drawable/overlay_neon_bg"
-        android:padding="16dp"
-        android:visibility="gone"
-        android:elevation="10dp">
+        android:clickable="false"
+        android:focusable="false"
+        android:elevation="1dp">
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Loading video..."
+            android:textColor="#99FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
 
+    <FrameLayout
+        android:id="@+id/brightnessIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:paddingStart="16dp"
+        android:paddingTop="90dp"
+        android:paddingBottom="90dp"
+        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/brightnessTrack"
+            android:layout_width="10dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="bottom"
+            android:background="@drawable/indicator_track">
+            <View
+                android:id="@+id/brightnessFill"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:background="@drawable/indicator_fill" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/volumeIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:paddingEnd="16dp"
+        android:paddingTop="90dp"
+        android:paddingBottom="90dp"
+        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/volumeTrack"
+            android:layout_width="10dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="bottom"
+            android:background="@drawable/indicator_track">
+            <View
+                android:id="@+id/volumeFill"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:background="@drawable/indicator_fill" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/seekIndicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_gravity="bottom"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp"
+        android:paddingBottom="64dp"
+        android:visibility="gone">
         <TextView
             android:id="@+id/seekTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="+10s"
+            android:text="0:00 / 0:00"
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:fontFamily="sans-serif-black" />
-
+            android:textSize="14sp"
+            android:shadowColor="#000000"
+            android:shadowRadius="4" />
         <ProgressBar
             android:id="@+id/seekProgress"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="88dp"
-            android:layout_height="4dp"
-            android:layout_marginTop="8dp"
-            android:progress="50"
-            android:progressTint="#FF2A3D" />
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:max="1000" />
     </LinearLayout>
 
-    <!-- SEEK BUTTONS -->
+    <View
+        android:id="@+id/touch_catcher"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="10dp" />
 
-
-
-
-    <!-- LOADING -->
-    <LinearLayout
-        android:id="@+id/loadingContainer"
+    <TextView
+        android:id="@+id/tvVideoName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
+        android:layout_gravity="bottom|start"
+        android:layout_margin="24dp"
+        android:elevation="11dp"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:shadowColor="#000000"
+        android:shadowRadius="4" />
+    <ImageButton
+        android:id="@+id/btnFavorite"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="20dp"
+        android:elevation="11dp"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:src="@android:drawable/btn_star_big_off" />
 
-        <ProgressBar
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_gravity="center"
-            android:indeterminateTint="#FF2A3D" />
-    </LinearLayout>
-
+    <ImageButton
+        android:id="@+id/btnSeekBack"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="12dp"
+        android:elevation="20dp"
+        android:background="@drawable/seek_btn_bg"
+        android:scaleType="fitCenter"
+        android:contentDescription="Inapoi"
+        android:src="@android:drawable/ic_media_rew" />
+    <ImageButton
+        android:id="@+id/btnSeekFwd"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="12dp"
+        android:elevation="20dp"
+        android:background="@drawable/seek_btn_bg"
+        android:scaleType="fitCenter"
+        android:contentDescription="Inainte"
+        android:src="@android:drawable/ic_media_ff" />
 </FrameLayout>

@@ -310,6 +310,8 @@ class VideoPagerAdapter(
         var player: ExoPlayer? = null
         val tvName: TextView = view.findViewById(R.id.tvVideoName)
         val btnFav: ImageButton = view.findViewById(R.id.btnFavorite)
+        val btnSeekBack: ImageButton = view.findViewById(R.id.btnSeekBack)
+        val btnSeekFwd: ImageButton = view.findViewById(R.id.btnSeekFwd)
         val loadingContainer: LinearLayout = view.findViewById(R.id.loadingContainer)
         val brightnessIndicator: FrameLayout = view.findViewById(R.id.brightnessIndicator)
         val brightnessFill: View = view.findViewById(R.id.brightnessFill)
@@ -383,6 +385,8 @@ class VideoPagerAdapter(
         // (nu le ținem mereu pe ecran; apar doar cu controllerul la atingere).
         val hideButtons = Runnable {
             if (holder.controllerVisibil) {
+                holder.btnSeekBack.visibility = View.GONE
+                holder.btnSeekFwd.visibility = View.GONE
                 holder.dragMod = 0
             }
         }
@@ -401,6 +405,8 @@ class VideoPagerAdapter(
                     if (!controlsVisible) {
                         holder.playerView.hideController()
                         holder.itemView.removeCallbacks(hideButtons)
+                        holder.btnSeekBack.visibility = View.GONE
+                        holder.btnSeekFwd.visibility = View.GONE
                         holder.controllerVisibil = false
                         return true
                     }
@@ -408,12 +414,16 @@ class VideoPagerAdapter(
                     val noul = !holder.controllerVisibil
                     if (noul) {
                         holder.playerView.showController()
+                        holder.btnSeekBack.visibility = View.VISIBLE
+                        holder.btnSeekFwd.visibility = View.VISIBLE
                         // butoanele dispar automat împreună cu controllerul (după timeout)
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.itemView.postDelayed(hideButtons, CTRL_TIMEOUT_MS)
                     } else {
                         holder.playerView.hideController()
                         holder.itemView.removeCallbacks(hideButtons)
+                        holder.btnSeekBack.visibility = View.GONE
+                        holder.btnSeekFwd.visibility = View.GONE
                     }
                     holder.controllerVisibil = noul
                     return true
@@ -588,6 +598,15 @@ class VideoPagerAdapter(
         // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări).
         // Implicit ASCUNSE; apar doar împreună cu controllerul media (la atingere).
         val secMs = seekStepSec.coerceIn(2, 30) * 1000L
+        holder.btnSeekBack.visibility = View.GONE
+        holder.btnSeekFwd.visibility = View.GONE
+        holder.btnSeekBack.setOnClickListener {
+            val d = player.duration.coerceAtLeast(0L)
+            val target = (player.currentPosition - secMs).coerceIn(0L, d)
+            player.seekTo(target)
+            if (d > 0) showSeekIndicator(holder, target, d)
+        }
+        holder.btnSeekFwd.setOnClickListener {
             val d = player.duration.coerceAtLeast(0L)
             val target = (player.currentPosition + secMs).coerceIn(0L, d)
             player.seekTo(target)
@@ -783,6 +802,8 @@ class VideoPagerAdapter(
             // ascundem imediat orice controale vizibile în toți holder-ii activi
             for (h in live.values) {
                 playerHolder[h]?.let { holder ->
+                    holder.btnSeekBack.visibility = View.GONE
+                    holder.btnSeekFwd.visibility = View.GONE
                 }
             }
         }
@@ -793,6 +814,8 @@ class VideoPagerAdapter(
         for (h in live.values) {
             playerHolder[h]?.let { holder ->
                 holder.playerView.hideController()
+                holder.btnSeekBack.visibility = View.GONE
+                holder.btnSeekFwd.visibility = View.GONE
                 holder.controllerVisibil = false
             }
         }
