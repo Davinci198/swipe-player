@@ -30,7 +30,6 @@ permissions:
   contents: read
 env:
   JAVA_VERSION: '17'
-  _JAVA_OPTIONS: '-Xmx4g'
 jobs:
   build:
     name: Build Android artifacts
@@ -70,9 +69,11 @@ jobs:
 
       - name: Install NDK and CMake
         run: |
-          sdkmanager --install 'ndk;27.0.12077973' 'cmake;3.22.1'
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-          echo "NDK_ROOT=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          unset _JAVA_OPTIONS
+          yes | sdkmanager --install 'ndk;27.0.12077973' 'cmake;3.22.1' --sdk_root=$ANDROID_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "NDK_ROOT=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
 
       - name: Set up swap
         uses: pierotofy/set-swap-space@master
@@ -103,11 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew ${{ steps.gradle-task.outputs.task }} \
-            --no-daemon \
-            --max-workers=1 \
-            -Dorg.gradle.jvmargs='-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError' \
-            -Dkotlin.daemon.jvmargs='-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200' 2>&1 | tee gradle.log
+          ./gradlew ${{ steps.gradle-task.outputs.task }} --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError' -Dkotlin.daemon.jvmargs='-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200' 2>&1 | tee gradle.log
           echo '=== BUILD COMPLETED SUCCESSFULLY ==='
           grep -i 'BUILD SUCCESSFUL' gradle.log || echo 'Build may have completed with warnings'
 
