@@ -1,5 +1,4 @@
 name: Build Debug APK
-
 on:
   push:
     branches: ["**"]
@@ -74,11 +73,17 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew :app:assembleOriginalDebug --stacktrace --no-daemon
 
+      - name: Set artifact name
+        run: |
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | sed "s/\//-/g")
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          echo "artifact_name=swipe-player-debug-${SAFE_BRANCH}-${SHORT_SHA}" >> $GITHUB_ENV
+
       - name: Upload Debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: swipe-player-debug-${{ replace(github.ref_name, '/', '-') }}-${{ github.sha[0:8] }}
+          name: ${{ env.artifact_name }}
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
           retention-days: 14
