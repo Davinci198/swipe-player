@@ -1,0 +1,23 @@
+* [33m05810ad[m[33m ([m[1;31morigin/feature/gestures-180mb-fix[m[33m)[m fix: restore M2.7 gesture fix without glitch buttons
+* [33m59171ff[m fix: remove remaining seekOverlay/seekText refs from MainActivity
+* [33m5799c5c[m fix: remove glitch button refs - match clean item_video.xml
+* [33m97e24ba[m fix: clean merge conflict markers - restore ad703a4 clean xml
+*   [33m537edf9[m merge main to resolve conflicts
+[32m|[m[33m\[m  
+[32m|[m * [33mdff4361[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/gestures-180mb-fix-clean[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/feature/gestures-180mb-fix-clean[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m, [m[1;32mfeature/gestures-180mb-fix[m[33m)[m Redesign/gesture controls (#6)
+[32m|[m * [33mefdf763[m feat: new video item design with system icons (#5)
+* [33m|[m [33mad703a4[m fix: keep M2.7 seek chain fix, revert mistral glitch xml
+* [33m|[m [33mc256216[m fix(volum): directie corecta (jos=LOWER), prag 8dp, fara flooding
+* [33m|[m [33mb84ef5d[m fix(seek): while() pt tot lantul de parinti, reconfirmare disallow pe fiecare MOVE, seek cu dx/view.width
+* [33m|[m [33m6751642[m fix(seek): dragStartX nu se mai reseteaza la intrarea in seek - conform demo-ului
+* [33m|[m [33m9be82a0[m fix(ci): artifact name - SHA scurt generat in run step cu cut -c1-8 (GitHub nu suporta slice in expresii)
+* [33m|[m [33m6100c05[m fix(ci): artifact name - inlocuieste / cu - din branch name, SHA scurt 8 chars
+* [33m|[m [33m09813bb[m ci(build): workflow robust - orice branch/tag, NDK27+Node conditionate, cache Gradle, assembleOriginalDebug
+[33m|[m [33m|[m * [33m944b5e0[m[33m ([m[1;31morigin/fix/seek-volum-fluid[m[33m, [m[1;32mfix/seek-volum-fluid[m[33m)[m fix(ci): artifact name - SHA scurt generat in run step cu cut -c1-8 (GitHub nu suporta slice in expresii)
+[33m|[m [33m|[m * [33mfa9f015[m fix(ci): artifact name via env var - SAFE_BRANCH cu sed inlocuieste / cu - (GitHub accepta doar litere, cifre, -, _)
+[33m|[m [33m|[m * [33m64f7c20[m fix(ci): artifact name - inlocuieste / cu - din branch name, SHA scurt 8 chars
+[33m|[m [33m|[m * [33mb89be3f[m ci(build): workflow robust - orice branch/tag, NDK27+Node conditionate, cache Gradle, assembleOriginalDebug
+[33m|[m [33m|[m * [33m7cd6055[m fix: seek fluid pe tot ecranul + volum continuu identic cu lumina
+[33m|[m [33m|[m[33m/[m  
+[33m|[m[33m/[m[33m|[m   
+* [33m|[m [33m2db1f8f[m volum: eliminat prag 25px - adjustStreamVolume direct la fiecare MOVE ca in demo (pasi proportionali 8px/treapta), delta incremental
