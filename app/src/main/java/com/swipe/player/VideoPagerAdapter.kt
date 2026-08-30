@@ -510,8 +510,11 @@ class VideoPagerAdapter(
                             3 -> {
                                 val d = player.duration.coerceAtLeast(0L)
                                 if (d > 0) showSeekIndicator(h, player.currentPosition, d)
+                                // BUG FIX: NU resetăm dragStartX — în demo, startX rămâne fix.
+                                // dxTotal = currentX - startX crește natural pe măsură ce miști,
+                                // și poziția video = currentPos + dxTotal*0.3 crește continuu.
+                                // Dacă resetăm dragStartX, dxTotal rămâne mic și seek-ul se oprește.
                                 h.dragStartPosMs = player.currentPosition
-                                h.dragStartX = event.x // resetez originea pentru dx de seek
                             }
                         }
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
