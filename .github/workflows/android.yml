@@ -1,6 +1,10 @@
 name: Build APK
 
 on:
+  push:
+    branches: [ main, "redesign/*", "feature/*" ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       build_variant:
@@ -91,6 +95,13 @@ jobs:
             --profile full \
             --archives "manual-deps" \
             --repository "$GITHUB_WORKSPACE"
+
+      - name: Restore dragonbones AAR from git
+        run: |
+          # prepare_android_dependencies.py șterge app/libs/ și extrage din libs.zip
+          # dar libs.zip nu conține dragonbones-release.aar, deci îl restaurăm din git
+          git checkout -- app/libs/dragonbones-release.aar || true
+          ls -lh app/libs/
 
       - name: Build APK
         env:
