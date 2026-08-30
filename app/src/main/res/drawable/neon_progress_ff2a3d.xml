@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ProgressBar neon: background alb 10% + progres #FF2A3D -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background: alb 10% -->
+    <item android:id="@android:id/background">
+        <shape>
+            <corners android:radius="2dp" />
+            <solid android:color="#1AFFFFFF" />
+        </shape>
+    </item>
+    <!-- Secondary progress (buffering): alb 25% -->
+    <item android:id="@android:id/secondaryProgress">
+        <clip>
+            <shape>
+                <corners android:radius="2dp" />
+                <solid android:color="#40FFFFFF" />
+            </shape>
+        </clip>
+    </item>
+    <!-- Progress principal: neon #FF2A3D -->
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <corners android:radius="2dp" />
+                <solid android:color="#FF2A3D" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>
