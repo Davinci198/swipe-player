@@ -479,46 +479,52 @@ class VideoPagerAdapter(
                     h.dragStartPosMs = player.currentPosition
                     h.seekActive = false
                     h.seekTargetMs = -1L
-                    val w = view.width.toFloat().coerceAtLeast(1f)
-                    // zonă de pornire (folosită doar ca sugestie inițială; direcția decide definitiv la MOVE)
-                    h.dragZona = when {
-                        event.x < w * 0.33f -> 2 // sugestie BRIGHTNESS (stânga)
-                        event.x > w * 0.66f -> 1 // sugestie VOLUME (dreapta)
-                        else -> 3                // sugestie SEEK (mijloc)
-                    }
-                    h.dragMod = 0 // nedecis încă — aștept prima mișcare ca să văd direcția dominantă
-                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} zona=${h.dragZona}")
-                    // blochez scroll-ul ViewPager pe durata gestului
-                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                    h.dragMod = 0
+                    h.dragZona = 0
+                    Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} y=${"%.0f".format(event.y)}")
+                    // NU blocăm încă — așteptăm să vedem direcția
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dy = h.dragStartY - event.y
-                    val dxTotal = event.x - h.dragStartX
-                    val dyTotal = h.dragStartY - event.y
+                    val dx = event.x - h.dragStartX
+                    val dy = event.y - h.dragStartY
+                    val adx = kotlin.math.abs(dx)
+                    val ady = kotlin.math.abs(dy)
 
-                    // DECIZIE la prima mișcare semnificativă: direcția dominantă alege modul.
-                    // ORIZONTAL dominant -> SEEK (oriunde pe ecran). VERTICAL dominant -> zona de pornire.
+                    // Prima decizie: pe baza direcției dominante
                     if (h.dragMod == 0) {
-                        val adx = kotlin.math.abs(dxTotal)
-                        val ady = kotlin.math.abs(dyTotal)
-                        if (adx < 12f && ady < 12f) return@setOnTouchListener true // prea puțin, aștept
-                        h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
-                        when (h.dragMod) {
-                            2 -> showVerticalIndicator(h, 2, currentBrightness)
-                            1 -> showVerticalIndicator(h, 1, currentVolume)
-                            3 -> {
-                                val d = player.duration.coerceAtLeast(0L)
-                                if (d > 0) showSeekIndicator(h, player.currentPosition, d)
-                                // BUG FIX: NU resetăm dragStartX — în demo, startX rămâne fix.
-                                // dxTotal = currentX - startX crește natural pe măsură ce miști,
-                                // și poziția video = currentPos + dxTotal*0.3 crește continuu.
-                                // Dacă resetăm dragStartX, dxTotal rămâne mic și seek-ul se oprește.
-                                h.dragStartPosMs = player.currentPosition
+                        val touchSlop = 8f * view.context.resources.displayMetrics.density // 8dp
+                        if (adx > touchSlop || ady > touchSlop) {
+                            // BLOCHEAZĂ TOT LANȚUL DE PĂRINȚI — asta e criteriul lipsă
+                            var p = view.parent
+                            while (p != null) {
+                                p.requestDisallowInterceptTouchEvent(true)
+                                p = p.parent
                             }
+
+                            h.dragMod = if (adx > ady) 3 else h.dragZona // orizontal=SEEK, vertical=zona
+                            when (h.dragMod) {
+                                2 -> showVerticalIndicator(h, 2, currentBrightness)
+                                1 -> showVerticalIndicator(h, 1, currentVolume)
+                                3 -> {
+                                    val d = player.duration.coerceAtLeast(0L)
+                                    if (d > 0) showSeekIndicator(h, player.currentPosition, d)
+                                    h.dragStartPosMs = player.currentPosition
+                                }
+                            }
+                            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                         }
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                         return@setOnTouchListener true
+                    }
+
+                    // RECONFIRMĂ disallow la FIECARE MOVE cât timp suntem în seek
+                    // Altfel ViewPager2 recapătă controlul între MOVE-uri
+                    if (h.dragMod == 3) {
+                        var p = view.parent
+                        while (p != null) {
+                            p.requestDisallowInterceptTouchEvent(true)
+                            p = p.parent
+                        }
                     }
 
                     when (h.dragMod) {
@@ -526,13 +532,12 @@ class VideoPagerAdapter(
                             currentBrightness = (currentBrightness + dy * 0.002f).coerceIn(0.01f, 1f)
                             h.dragStartY = event.y // delta incremental
                             onBrightnessChange?.invoke(currentBrightness)
-                            aplicaDim(h, currentBrightness) // fallback vizual (Motorola)
+                            aplicaDim(h, currentBrightness)
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        1 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
-                            // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
-                            val pasi = (kotlin.math.abs(dy) / 8f).toInt().coerceAtLeast(1)
+                        1 -> { // VOLUME: trepte sistem direct la fiecare MOVE (ca în demo, FĂRĂ prag)
+                            val pasi = (ady / 8f).toInt().coerceAtLeast(1)
                             val am = audioManager()
                             repeat(pasi) {
                                 am?.adjustStreamVolume(
@@ -547,17 +552,19 @@ class VideoPagerAdapter(
                             playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
                             onVolumeChange?.invoke(currentVolume)
                             showVerticalIndicator(h, 1, currentVolume)
-                            h.dragStartY = event.y // delta incremental, ca la luminozitate
+                            h.dragStartY = event.y // delta incremental
                             true
                         }
-                        3 -> { // SEEK: preview fluid la MOVE (fără seekTo); seek REAL doar la UP
+                        3 -> { // SEEK: preview la fiecare MOVE; seek REAL doar la UP
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                val deltaMs = (dxTotal * 0.3f).toLong()
-                                val target = (h.dragStartPosMs + deltaMs).coerceIn(0L, durata)
-                                h.seekTargetMs = target // rețin ținta; NU seek aici (rebuffer lent la fiecare move)
+                                // Folosim dx proaspăt (ca în demo) — poziție relativă la start-ul gestului
+                                val percent = dx / view.width // -1..1
+                                val seekDelta = (percent * 90_000).toLong() // max ±90 sec
+                                val target = (h.dragStartPosMs + seekDelta).coerceIn(0L, durata)
+                                h.seekTargetMs = target
                                 h.seekActive = true
-                                showSeekIndicator(h, target, durata) // doar preview UI fluid
+                                showSeekIndicator(h, target, durata)
                             }
                             true
                         }
@@ -565,7 +572,13 @@ class VideoPagerAdapter(
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    // seek REAL o singură dată, la ridicarea degetului (nu la fiecare move)
+                    // ELIBEREAZĂ TOT LANȚUL DE PĂRINȚI
+                    var p = view.parent
+                    while (p != null) {
+                        p.requestDisallowInterceptTouchEvent(false)
+                        p = p.parent
+                    }
+                    // seek REAL o singură dată, la ridicarea degetului
                     if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
                         player.seekTo(h.seekTargetMs)
                         h.seekTargetMs = -1L
@@ -575,7 +588,6 @@ class VideoPagerAdapter(
                     h.dragMod = 0
                     h.dragZona = 0
                     h.seekActive = false
-                    view.parent?.requestDisallowInterceptTouchEvent(false)
                     true
                 }
                 else -> true
