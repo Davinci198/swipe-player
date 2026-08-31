@@ -498,7 +498,7 @@ class VideoPagerAdapter(
                     val dy = event.y - h.dragStartY
                     val w87 = view.width.toFloat().coerceAtLeast(1f)
                     val isLeft = h.dragStartX < w87 * 0.25f
-                    val isRight = h.dragStartX > w87 * 0.75f
+                    val isRight = h.dragStartX > w87 * 0.60f
                     if (h.dragMod == 0 && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
                         if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
                             if (isLeft || isRight) {
@@ -525,7 +525,7 @@ class VideoPagerAdapter(
                         }
                         2 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
                             // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
-                            val pasi = (kotlin.math.abs(dy) / 8f).toInt().coerceAtLeast(1)
+                            val pasi = (kotlin.math.abs(dy) / 8f * 2.5f).toInt().coerceAtLeast(1) // #88: 2.5x sensibil
                             val am = audioManager()
                             repeat(pasi) {
                                 am?.adjustStreamVolume(
