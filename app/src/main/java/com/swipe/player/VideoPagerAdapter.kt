@@ -510,6 +510,9 @@ class VideoPagerAdapter(
                             return@setOnTouchListener false
                         } else if (Math.abs(dx) > 12) {
                             h.dragMod = 3 // seek orizontal
+                            // anti-furt ViewPager2: reconfirmăm intercept pe TOȚI părinții ca seek-ul să nu fie furat
+                            var p = view.parent
+                            while (p != null) { p.requestDisallowInterceptTouchEvent(true); p = p.parent }
                         }
                     }
                     if (h.dragMod == 4) return@setOnTouchListener false
@@ -524,24 +527,12 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 2, currentBrightness)
                             true
                         }
-                        2 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
-                            // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
-                            val pasi = (kotlin.math.abs(dy) / 3f).toInt().coerceAtLeast(2) // #89: 3px = 2 trepte, ultra sensibil
-                            val am = audioManager()
-                            repeat(pasi) {
-                                am?.adjustStreamVolume(
-                                    AudioManager.STREAM_MUSIC,
-                                    if (dy < 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-                                    0
-                                )
-                            }
-                            val max = am?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
-                            val cur = am?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-                            currentVolume = if (max > 0) cur.toFloat() / max else currentVolume
-                            playerActiv?.volume = currentVolume.coerceIn(0f, 1f)
+                        2 -> { // VOLUME continuu, identic cu lumina: dy * 0.002f incremental (sus = mai tare)
+                            currentVolume = (currentVolume - dy * 0.002f).coerceIn(0f, 1f)
+                            h.dragStartY = event.y // delta incremental, ca la luminozitate
+                            aplicaVolumSistem(currentVolume) // volum sistem continuu (nu trepte)
                             onVolumeChange?.invoke(currentVolume)
                             showVerticalIndicator(h, 1, currentVolume)
-                            h.dragStartY = event.y // delta incremental, ca la luminozitate
                             true
                         }
                         3 -> { // SEEK: dx / w * 120 secunde (preview fluid la MOVE; seek REAL doar la UP)
