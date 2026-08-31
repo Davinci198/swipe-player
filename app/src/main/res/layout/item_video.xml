@@ -186,6 +186,8 @@
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
         android:contentDescription="Înapoi"
+        android:visibility="gone"
+        android:clickable="false"
         android:src="@android:drawable/ic_media_rew" />
     <ImageButton
         android:id="@+id/btnSeekFwd"
@@ -197,6 +199,8 @@
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
         android:contentDescription="Înainte"
+        android:visibility="gone"
+        android:clickable="false"
         android:src="@android:drawable/ic_media_ff" />
 
     <!-- ============================================================

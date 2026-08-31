@@ -589,18 +589,19 @@ class VideoPagerAdapter(
         val secMs = seekStepSec.coerceIn(2, 30) * 1000L
         holder.btnSeekBack.visibility = View.GONE
         holder.btnSeekFwd.visibility = View.GONE
-        holder.btnSeekBack.setOnClickListener {
-            val d = player.duration.coerceAtLeast(0L)
-            val target = (player.currentPosition - secMs).coerceIn(0L, d)
-            player.seekTo(target)
-            if (d > 0) showSeekIndicator(holder, target, d)
-        }
-        holder.btnSeekFwd.setOnClickListener {
-            val d = player.duration.coerceAtLeast(0L)
-            val target = (player.currentPosition + secMs).coerceIn(0L, d)
-            player.seekTo(target)
-            if (d > 0) showSeekIndicator(holder, target, d)
-        }
+        // #90: butoane dezactivate (gone în layout) — blocuri comentate ca să nu mai fie apelate
+        // holder.btnSeekBack.setOnClickListener {
+        //     val d = player.duration.coerceAtLeast(0L)
+        //     val target = (player.currentPosition - secMs).coerceIn(0L, d)
+        //     player.seekTo(target)
+        //     if (d > 0) showSeekIndicator(holder, target, d)
+        // }
+        // holder.btnSeekFwd.setOnClickListener {
+        //     val d = player.duration.coerceAtLeast(0L)
+        //     val target = (player.currentPosition + secMs).coerceIn(0L, d)
+        //     player.seekTo(target)
+        //     if (d > 0) showSeekIndicator(holder, target, d)
+        // }
 
     }
 
