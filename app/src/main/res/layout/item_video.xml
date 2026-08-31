@@ -13,7 +13,9 @@
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:use_controller="true"
+        app:use_controller="false"
+        android:clickable="false"
+        android:focusable="false"
         app:resize_mode="fit" />
 
     <!-- 1b. Overlay de attenuire (dim) pt luminozitate: fallback vizibil cand
@@ -142,8 +144,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:clickable="true"
-        android:focusable="true"
+        android:clickable="false"
+        android:focusable="false"
         android:elevation="10dp" />
 
     <!-- Nume videoclip + buton fav: declarate DUPĂ touch_catcher => deasupra lui
@@ -184,6 +186,8 @@
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
         android:contentDescription="Înapoi"
+        android:visibility="gone"
+        android:clickable="false"
         android:src="@android:drawable/ic_media_rew" />
     <ImageButton
         android:id="@+id/btnSeekFwd"
@@ -195,5 +199,102 @@
         android:background="@drawable/seek_btn_bg"
         android:scaleType="fitCenter"
         android:contentDescription="Înainte"
+        android:visibility="gone"
+        android:clickable="false"
         android:src="@android:drawable/ic_media_ff" />
+
+    <!-- ============================================================
+         GESTURE INTERCEPT + OVERLAY-URI NEON (design #08080A / #FF2A3D)
+         touchIntercept: strat transparent DUPĂ playerView (vizual), clickable+focusable
+         ca să primească touch-ul peste PlayerView (care are use_controller=false).
+         Cele 2 overlay-uri sunt 48dp x 180dp, centrate vertical pe stânga/dreapta,
+         cu ProgressBar orizontal rotit -90 (=> afișat vertical) și iconiță jos.
+         ============================================================ -->
+    <View
+        android:id="@+id/touchIntercept"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Overlay BRIGHTNESS (stânga): pill sticlă 64dp x 220dp, iconiță galbenă SUS,
+         bară verticală GALBENĂ, procent alb JOS (ca în demo) -->
+    <LinearLayout
+        android:id="@+id/brightnessOverlay"
+        android:layout_width="52dp"
+        android:layout_height="170dp"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/bg_overlay_dark"
+        android:visibility="gone"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="11dp"
+        android:paddingBottom="11dp"
+        android:elevation="30dp">
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_brightness"
+            android:tint="#FFC107" />
+        <ProgressBar
+            android:id="@+id/brightnessProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="96dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:rotation="-90"
+            android:max="100"
+            android:progress="100"
+            android:progressDrawable="@drawable/neon_progress_amber" />
+        <TextView
+            android:id="@+id/brightnessPct"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="100%"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Overlay VOLUME (dreapta): pill sticlă 52dp x 170dp, iconiță roșie SUS,
+         bară verticală ROȘIE, procent alb JOS (ca în demo) -->
+    <LinearLayout
+        android:id="@+id/volumeOverlay"
+        android:layout_width="52dp"
+        android:layout_height="170dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_overlay_dark"
+        android:visibility="gone"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="11dp"
+        android:paddingBottom="11dp"
+        android:elevation="30dp">
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_volume"
+            android:tint="#FF2A3D" />
+        <ProgressBar
+            android:id="@+id/volumeProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="96dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:rotation="-90"
+            android:max="100"
+            android:progress="100"
+            android:progressDrawable="@drawable/neon_progress_ff2a3d" />
+        <TextView
+            android:id="@+id/volumePct"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="100%"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 </FrameLayout>

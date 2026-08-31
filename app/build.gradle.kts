@@ -65,6 +65,12 @@ android {
         }
         debug {
             isDebuggable = true
+            // Reducere dimensiune APK în debug: doar arm64-v8a
+            // (suprascrie abiFilters din defaultConfig; .so mai puține -> APK mai mic)
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
         }
     }
 
