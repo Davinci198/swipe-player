@@ -497,18 +497,19 @@ class VideoPagerAdapter(
                     val dx = event.x - h.dragStartX
                     val dy = event.y - h.dragStartY
                     val w87 = view.width.toFloat().coerceAtLeast(1f)
-                    val isLeft = h.dragStartX < w87 * 0.25f
-                    val isRight = h.dragStartX > w87 * 0.60f
-                    if (h.dragMod == 0 && (Math.abs(dx) > 15 || Math.abs(dy) > 15)) {
-                        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
-                            if (isLeft || isRight) {
-                                h.dragMod = if (isLeft) 1 else 2 // 1=brightness, 2=volum
-                            } else {
-                                h.dragMod = 4 // vertical TikTok -> lasăm ViewPager-ul
-                                return@setOnTouchListener false
-                            }
-                        } else if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 15) {
-                            h.dragMod = 3 // seek orizontal — ORICE zonă
+                    if (h.dragMod == 0) {
+                        val isRight = h.dragStartX > w87 * 0.60f
+                        val isLeft = h.dragStartX < w87 * 0.40f
+                        // VOLUM/BRIGHTNESS: prioritate maxima pe margini, chiar și cu dx mare
+                        if (isRight && Math.abs(dy) > 8) {
+                            h.dragMod = 2
+                        } else if (isLeft && Math.abs(dy) > 8) {
+                            h.dragMod = 1
+                        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
+                            h.dragMod = 4 // vertical TikTok -> lasăm ViewPager-ul
+                            return@setOnTouchListener false
+                        } else if (Math.abs(dx) > 12) {
+                            h.dragMod = 3 // seek orizontal
                         }
                     }
                     if (h.dragMod == 4) return@setOnTouchListener false
@@ -525,7 +526,7 @@ class VideoPagerAdapter(
                         }
                         2 -> { // VOLUME: trepte sistem DIRECT la fiecare MOVE (ca în demo, FĂRĂ prag)
                             // un pas vizibil pe MOVE pentru a nu sari prea multe trepte pe un singur pixel
-                            val pasi = (kotlin.math.abs(dy) / 8f * 2.5f).toInt().coerceAtLeast(1) // #88: 2.5x sensibil
+                            val pasi = (kotlin.math.abs(dy) / 3f).toInt().coerceAtLeast(2) // #89: 3px = 2 trepte, ultra sensibil
                             val am = audioManager()
                             repeat(pasi) {
                                 am?.adjustStreamVolume(
