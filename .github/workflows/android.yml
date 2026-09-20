@@ -86,30 +86,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Restore Android dependency cache
-        id: cache-manual-deps
-        uses: actions/cache@v4
-        with:
-          path: manual-deps
-          key: android-deps-${{ runner.os }}-${{ hashFiles('ci/script/download_android_dependencies.sh', 'ci/script/prepare_android_dependencies.py') }}
-
-      - name: Download Android dependencies
-        if: steps.cache-manual-deps.outputs.cache-hit != 'true'
-        run: bash ci/script/download_android_dependencies.sh full "manual-deps"
-
-      - name: Prepare Android dependencies
-        run: |
-          python3 ci/script/prepare_android_dependencies.py \
-            --profile full \
-            --archives "manual-deps" \
-            --repository "$GITHUB_WORKSPACE"
-
-      - name: Restore dragonbones AAR from git
-        run: |
-          # prepare_android_dependencies.py șterge app/libs/ și extrage din libs.zip
-          # dar libs.zip nu conține dragonbones-release.aar, deci îl restaurăm din git
-          git checkout -- app/libs/dragonbones-release.aar || true
-          ls -lh app/libs/
+      # Pașii de "Download/Prepare Android dependencies" (arhive din Google Drive
+      # moștenite de la proiectul operit) au fost eliminați: codul actual nu
+      # folosește models/subpack/jniLibs din acele zip-uri, download-ul pică de la
+      # quota Drive, iar AAR-ul dragonbones e comis direct în git (app/libs/).
 
       - name: Build APK
         env:
