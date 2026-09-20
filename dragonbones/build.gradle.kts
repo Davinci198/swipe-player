@@ -4,7 +4,7 @@ plugins {
 }
 android {
     namespace = "com.dragonbones"
-    compileSdk = 36
+    compileSdk = 34
     defaultConfig {
         minSdk = 26
         ndkVersion = "27.0.12077973"
