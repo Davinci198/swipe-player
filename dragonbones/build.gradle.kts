@@ -4,7 +4,7 @@ plugins {
 }
 android {
     namespace = "com.dragonbones"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         minSdk = 26
         ndkVersion = "27.0.12077973"
@@ -12,7 +12,7 @@ android {
         consumerProguardFiles("consumer-rules.pro")
         externalNativeBuild {
             cmake {
-                arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DANDROID_STL=c++_static")
+                arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DANDROID_STL=c++_shared")
             }
         }
     }

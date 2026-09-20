@@ -149,7 +149,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // Pauză automată la apel telefonic (cu permisiunile READ_PHONE_STATE opționale)
         try {
             val ffPhone = IntentFilter(android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED)
-            registerReceiver(phoneStateReceiver, ffPhone)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(phoneStateReceiver, ffPhone, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(phoneStateReceiver, ffPhone)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Nu pot înregistra receiver-ul de stare telefonică", e)
         }
@@ -205,6 +209,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         })
 
         // bara de control foto (jos, doar în modul Poze): luminozitate + volum
+        photoBrightnessSeek.max = 1000
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         photoBrightnessSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
@@ -213,6 +218,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
             override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
         })
+        photoVolumeSeek.max = 1000
         photoVolumeSeek.progress = (volumCurent * 1000).toInt()
         photoVolumeSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
