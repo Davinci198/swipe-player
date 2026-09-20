@@ -72,6 +72,7 @@ jobs:
       - name: Accept Android SDK licenses
         run: |
           unset _JAVA_OPTIONS
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
           yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME > /dev/null || true
           sdkmanager --install 'platform-tools' --sdk_root=$ANDROID_HOME
 
