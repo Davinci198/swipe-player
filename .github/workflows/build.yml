@@ -79,6 +79,7 @@ jobs:
       - name: Install NDK and CMake
         run: |
           unset _JAVA_OPTIONS
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
           yes | sdkmanager --install 'ndk;27.0.12077973' 'cmake;3.22.1' --sdk_root=$ANDROID_HOME
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
           echo "NDK_ROOT=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
