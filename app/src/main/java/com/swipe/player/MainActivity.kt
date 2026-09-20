@@ -130,6 +130,27 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     // modul curent: "video" sau "photo"
     private var modCurent: String = "video"
 
+    // Callback unic pentru schimbarea paginii video (instanțiat o singură dată;
+    // re-înregistrat la fiecare listă nouă, dar vechiul e dezînregistrat explicit).
+    private val onVideoPageSelected = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            adapter?.setActivePage(position)
+        }
+    }
+
+    // Callback unic pentru galeria foto (la fel: o singură instanță, înregistrată o dată).
+    private val onPhotoPageSelected = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            thumbAdapter?.let { ta ->
+                photoThumbStrip.post { ta.notifyDataSetChanged() }
+                photoThumbStrip.scrollToPosition(position)
+            }
+            actualizeazaButonFavorit(position)
+            // interacțiune => resetăm cronometrul de ascundere a controalelor
+            planificaAscundere()
+        }
+    }
+
     // true cât timp e deschis picker-ul de fișiere (galerie) → ca onUserLeaveHint să NU intre în PiP atunci
     private var pickerDeschis = false
 
@@ -196,17 +217,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
 
         // când schimbi poza din galerie, evidențiem miniatura corespunzătoare
-        imagePager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                thumbAdapter?.let { ta ->
-                    photoThumbStrip.post { ta.notifyDataSetChanged() }
-                    photoThumbStrip.scrollToPosition(position)
-                }
-                actualizeazaButonFavorit(position)
-                // interacțiune => resetăm cronometrul de ascundere a controalelor
-                planificaAscundere()
-            }
-        })
+        imagePager.registerOnPageChangeCallback(onPhotoPageSelected)
 
         // bara de control foto (jos, doar în modul Poze): luminozitate + volum
         photoBrightnessSeek.max = 1000
@@ -731,12 +742,11 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         adapter = nouAdapter
         viewPager.adapter = nouAdapter
 
-        // Când se schimbă pagina vizibilă => oprește celelalte videoclipuri, pornește pe cel nou
-        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                nouAdapter.setActivePage(position)
-            }
-        })
+        // BUG: la fiecare "Alege videoclipuri" se înregistra un callback NOU fără să
+        // se dezînregistreze cel vechi => acumulare de callback-uri + leak de adapter.
+        // FIX: dezînregistrăm callback-ul anterior înainte de a-l înregistra pe cel nou.
+        viewPager.unregisterOnPageChangeCallback(onVideoPageSelected)
+        viewPager.registerOnPageChangeCallback(onVideoPageSelected)
         nouAdapter.setActivePage(0) // doar primul videoclip pornește, restul rămân oprite
 
         // aplică luminozitatea doar dacă e într-un interval rezonabil (bug sistem: nu forțăm 10%)
@@ -818,10 +828,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         salveazaSetarileCurente()
         // altfel rămâne un service orfan + notificare după închiderea aplicației
         PlaybackService.stopPlaybackService(this)
-        // eliberăm toți ExoPlayerii la închiderea completă (evită crash/leak de playere
-        // legate de o Activitate distrusă); imaginile nu țin playere, doar decodează.
+        // eliberăm toți ExoPlayerii la închiserea completă (evită crash/leak de playere
+        // legate de o Activitate distrusă) și oprim și executorul de decodare poze.
         try { adapter?.elibereazaTot() } catch (e: Exception) { }
         adapter = null
+        try { photoAdapter?.shutdown() } catch (e: Exception) { }
+        photoAdapter = null
         (dragonBonesBridge as? com.swipe.player.DragonBonesBridge)?.release()
         try { unregisterReceiver(playbackControlReceiver) } catch (e: Exception) {}
         try { unregisterReceiver(phoneStateReceiver) } catch (e: Exception) {}

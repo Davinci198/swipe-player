@@ -230,7 +230,10 @@ class VideoPagerAdapter(
             pool.clear()
             playerHolder.clear()
             playerActiv = null
-            playerHolder.clear()
+            // BUG (leak): trackSelector-ul comun nu era eliberat niciodată; la fiecare
+            // "Alege videoclipuri" se crea un adapter nou => un DefaultTrackSelector
+            // nou per instanță, fiecare cu listener-e interne pe playerii eliberați.
+            try { trackSelector.release() } catch (e: Exception) { }
         } catch (e: Exception) {
             Log.e(TAG, "Eroare eliberare playere", e)
         }
