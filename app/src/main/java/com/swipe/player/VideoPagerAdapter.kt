@@ -377,7 +377,10 @@ class VideoPagerAdapter(
             if (istoric.isNotEmpty()) {
                 val durataMs = player.duration
                 val poz = (istoric.last()["pozitie"] as? Int ?: 0) * 1000L
-                if (poz > 0 && durataMs > 0 && poz < durataMs - 2000) {
+                // durataMs poate fi C.TIME_UNSET (negativ) înainte de prepare() —
+                // în acel caz permitem seek-ul (garda reală e "poz < durata-2s");
+                // condiția `durataMs > 0` ar bloca TOTAL restaurarea progresului.
+                if (poz > 0 && (durataMs <= 0 || poz < durataMs - 2000)) {
                     player.seekTo(poz)
                 }
             }
