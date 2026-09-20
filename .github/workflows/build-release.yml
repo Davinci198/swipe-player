@@ -60,11 +60,19 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v2
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # android-actions/setup-android@v3 pica: instalează pachetul 'tools',
+      # retras din repository-ul SDK ("Failed to find package 'tools'").
+      # Runner-ul ubuntu-24.04 are SDK + platform-tools preinstalate.
+      - name: Accept Android SDK licenses
+        run: |
+          unset _JAVA_OPTIONS
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME > /dev/null || true
+          sdkmanager --install 'platform-tools' --sdk_root=$ANDROID_HOME
 
       - name: Install NDK and CMake
         run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
           sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "NDK_ROOT=$ANDROID_NDK_HOME" >> $GITHUB_ENV

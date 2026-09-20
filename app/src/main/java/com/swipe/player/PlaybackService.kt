@@ -190,8 +190,10 @@ class PlaybackService : Service() {
     }
 
     private fun pendingFor(action: String): PendingIntent {
-        val intent = Intent(this, controlReceiver::class.java).apply { this.action = action }
-        // explicit receiver => sigur pe Android 8+
+        val intent = Intent(action).apply {
+            setPackage(packageName)
+        }
+        // explicit implicit via setPackage => sigur pe Android 8+
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getBroadcast(this, action.hashCode(), intent, flags)
     }

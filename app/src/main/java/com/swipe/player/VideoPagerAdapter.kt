@@ -377,6 +377,9 @@ class VideoPagerAdapter(
             if (istoric.isNotEmpty()) {
                 val durataMs = player.duration
                 val poz = (istoric.last()["pozitie"] as? Int ?: 0) * 1000L
+                // durataMs poate fi C.TIME_UNSET (negativ) înainte de prepare() —
+                // în acel caz permitem seek-ul (garda reală e "poz < durata-2s");
+                // condiția `durataMs > 0` ar bloca TOTAL restaurarea progresului.
                 if (poz > 0 && (durataMs <= 0 || poz < durataMs - 2000)) {
                     player.seekTo(poz)
                 }
@@ -730,7 +733,7 @@ class VideoPagerAdapter(
     private fun showSeekIndicator(holder: VH?, posMs: Long, durMs: Long) {
         holder ?: return
         holder.seekIndicator.visibility = View.VISIBLE
-        val p = (if (durMs > 0) ((posMs * 1000) / durMs).toInt() else 0).coerceIn(0, 1000)
+        val p = (if (durMs > 0) ((posMs * 100) / durMs).toInt() else 0).coerceIn(0, 100)
         holder.seekProgress.progress = p
         holder.seekTime.text = "${fmtTimp(posMs)} / ${fmtTimp(durMs)}"
     }
