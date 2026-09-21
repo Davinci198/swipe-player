@@ -21,7 +21,17 @@ class ThumbnailAdapter(
     private val onClick: (position: Int) -> Unit
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ThumbnailAdapter.ThVH>() {
 
-    private val loader = Executors.newSingleThreadExecutor()
+    private val loader = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "thumb-decoder").apply { isDaemon = true }
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: androidx.recyclerview.widget.RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        // BUG (leak, același tipar ca în ImagePagerAdapter): executorul nu era oprit —
+        // la fiecare actualizeazaMiniaturi() se creează un adapter nou, iar vechiul
+        // rămânea cu thread non-daemon idle care ține contextul. La detach, îl oprim.
+        loader.shutdownNow()
+    }
 
     class ThVH(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
         val image: ImageView = view.findViewById(R.id.thumbImg)

@@ -230,7 +230,10 @@ class VideoPagerAdapter(
             pool.clear()
             playerHolder.clear()
             playerActiv = null
-            playerHolder.clear()
+            // BUG (leak): trackSelector-ul comun nu era eliberat niciodată; la fiecare
+            // "Alege videoclipuri" se crea un adapter nou => un DefaultTrackSelector
+            // nou per instanță, fiecare cu listener-e interne pe playerii eliberați.
+            try { trackSelector.release() } catch (e: Exception) { }
         } catch (e: Exception) {
             Log.e(TAG, "Eroare eliberare playere", e)
         }
@@ -340,6 +343,10 @@ class VideoPagerAdapter(
         var seekTargetMs = -1L // poziția țintă în timpul drag-ului de seek (seek real doar la UP)
         val dragThreshold = 8f // prag activare gest orizontal (px) pentru seek (mai sensibil)
 
+        // Runnable de auto-ascundere a butoanelor ⏪/⏩ — re-creât la fiecare bind, dar
+        // referința se păstrează în holder ca să poată fi anulată la onViewRecycled.
+        var hideButtonsRunnable: Runnable = Runnable {}
+
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
     }
@@ -402,6 +409,7 @@ class VideoPagerAdapter(
                 holder.dragMod = 0
             }
         }
+        holder.hideButtonsRunnable = hideButtons
 
         // ===== Gesture State Machine =====
         // Un singur GestureDetector (taps) + un singur OnTouchListener (drag-uri).
@@ -606,6 +614,10 @@ class VideoPagerAdapter(
             ov.alpha = 0f
             ov.visibility = View.INVISIBLE
         }
+        // BUG: la recycle, un "hideButtons" postDelayed putea rula PESTE noua stare
+        // (butoanele ⏪/⏩ dispar brusc la bind-ul următor) + cleanup pending callbacks
+        holder.itemView.removeCallbacks(holder.hideButtonsRunnable)
+        holder.controllerVisibil = false
         hideIndicators(holder)
         val position = holder.adapterPosition
         if (position != RecyclerView.NO_POSITION) {

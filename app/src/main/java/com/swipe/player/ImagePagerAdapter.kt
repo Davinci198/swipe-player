@@ -28,7 +28,19 @@ class ImagePagerAdapter(
     private val items: List<Uri>
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ImagePagerAdapter.ImgVH>() {
 
-    private val loaderQueue = Executors.newSingleThreadExecutor()
+    private val loaderQueue = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "image-decoder").apply { isDaemon = true }
+    }
+
+    /**
+     * BUG (leak): executorul seriază decodările, dar nu era niciodată oprit — la fiecare
+     * "Alege poze"/redenumire/ștergere se crea un adapter nou, deci un thread nou per
+     * instanță (săptămânal: zeci de thread-uri idle). Apelat din onDestroy() al Activity.
+     */
+    fun shutdown() {
+        loaderQueue.shutdownNow()
+        cache.evictAll()
+    }
     private val cache: LruCache<String, Bitmap>
 
     init {
