@@ -346,6 +346,8 @@ class VideoPagerAdapter(
         // Runnable de auto-ascundere a butoanelor ⏪/⏩ — re-creât la fiecare bind, dar
         // referința se păstrează în holder ca să poată fi anulată la onViewRecycled.
         var hideButtonsRunnable: Runnable = Runnable {}
+        // Runnable-ul pentru ascunderea întârziată a indicatorilor, anulat la recycle/rebind.
+        var hideIndicatorsRunnable: Runnable = Runnable {}
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
@@ -357,6 +359,12 @@ class VideoPagerAdapter(
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
+        // Un bind nou poate reutiliza holder-ul fără onViewRecycled (de ex. notifyItemChanged);
+        // anulăm callback-urile vechi înainte să înregistrăm starea noului videoclip.
+        holder.itemView.removeCallbacks(holder.hideButtonsRunnable)
+        holder.itemView.removeCallbacks(holder.hideIndicatorsRunnable)
+        holder.controllerVisibil = false
+
         val uri = items[position]
         val videoName = names.getOrElse(position) { "Video ${position + 1}" }
         holder.tvName.text = videoName
@@ -459,6 +467,8 @@ class VideoPagerAdapter(
             }
         )
         val h = holder // referință locală pentru readabilitate
+        val hideIndicatorsRunnable = Runnable { hideIndicators(h) }
+        h.hideIndicatorsRunnable = hideIndicatorsRunnable
         // Ascultam pe perdeaua deasupra videoclipului (touchCatcher), nu pe PlayerView,
         // ca PlayerView/controllerul sa nu concureze pentru gesturi.
         h.touchIntercept.setOnTouchListener { view, event ->
@@ -517,8 +527,12 @@ class VideoPagerAdapter(
                         } else if (isLeft && Math.abs(dy) > 8) {
                             h.dragMod = 1
                         } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
-                            h.dragMod = 4 // vertical TikTok -> lasăm ViewPager-ul
-                            return@setOnTouchListener false
+                            h.dragMod = 4 // vertical TikTok -> lăsăm ViewPager-ul
+                            // ACTION_DOWN a fost deja consumat de overlay; un return false
+                            // ulterior nu pasează automat gestul către ViewPager2. Eliberăm
+                            // interceptarea, iar părintele va prelua următorul MOVE.
+                            view.parent?.requestDisallowInterceptTouchEvent(false)
+                            return@setOnTouchListener true
                         } else if (Math.abs(dx) > 12) {
                             h.dragMod = 3 // seek orizontal
                             // anti-furt ViewPager2: reconfirmăm intercept pe TOȚI părinții ca seek-ul să nu fie furat
@@ -526,7 +540,7 @@ class VideoPagerAdapter(
                             while (p != null) { p.requestDisallowInterceptTouchEvent(true); p = p.parent }
                         }
                     }
-                    if (h.dragMod == 4) return@setOnTouchListener false
+                    if (h.dragMod == 4) return@setOnTouchListener true
                     if (h.dragMod == 0) return@setOnTouchListener true // încă nedecis, îl ținem noi
 
                     when (h.dragMod) {
@@ -561,14 +575,19 @@ class VideoPagerAdapter(
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (h.dragMod == 4) { h.dragMod = 0; return@setOnTouchListener false }
+                    if (h.dragMod == 4) {
+                        h.dragMod = 0
+                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                        return@setOnTouchListener true
+                    }
                     // seek REAL o singură dată, la ridicarea degetului (nu la fiecare move)
                     if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
                         player.seekTo(h.seekTargetMs)
                         h.seekTargetMs = -1L
                     }
                     // ascunde overlay-urile cu un mic delay (spring-like), ca în demo
-                    view.postDelayed({ hideIndicators(h) }, 800)
+                    view.removeCallbacks(hideIndicatorsRunnable)
+                    view.postDelayed(hideIndicatorsRunnable, 800)
                     h.dragMod = 0
                     h.dragZona = 0
                     h.seekActive = false
@@ -617,6 +636,7 @@ class VideoPagerAdapter(
         // BUG: la recycle, un "hideButtons" postDelayed putea rula PESTE noua stare
         // (butoanele ⏪/⏩ dispar brusc la bind-ul următor) + cleanup pending callbacks
         holder.itemView.removeCallbacks(holder.hideButtonsRunnable)
+        holder.itemView.removeCallbacks(holder.hideIndicatorsRunnable)
         holder.controllerVisibil = false
         hideIndicators(holder)
         val position = holder.adapterPosition
