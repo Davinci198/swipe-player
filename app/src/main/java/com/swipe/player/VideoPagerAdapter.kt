@@ -46,7 +46,7 @@ class VideoPagerAdapter(
     var currentBrightness: Float = 1f
         set(v) { field = v.coerceIn(0.15f, 1f) } // max 1.0 (screenBrightness)
     var currentVolume: Float = initialVolume ?: 1f
-        set(v) { field = v.coerceIn(0f, 1f); onVolumeChange?.invoke(field) }
+        set(v) { field = v.coerceIn(0f, 1f) }
 
     // selecttor de track comun, folosit pentru a limita rezoluția de decodare a tuturor player-urilor
     private val trackSelector = DefaultTrackSelector(context)
@@ -333,7 +333,7 @@ class VideoPagerAdapter(
         val volumePct: TextView = view.findViewById(R.id.volumePct)
 
         // stare drag - locală pe ViewHolder (fără race condition între pagini)
-        var dragMod = 0 // 0=none, 1=volum, 2=luminozitate, 3=seek, 4=scroll
+        var dragMod = 0 // 0=none, 1=luminozitate, 2=volum, 3=seek, 4=scroll
         var dragZona = 0 // 0=mijloc(scroll), 1=margine stânga(lumină), 2=margine dreapta(volum)
         var dragStartX = 0f
         var dragStartY = 0f
@@ -421,7 +421,7 @@ class VideoPagerAdapter(
 
         // ===== Gesture State Machine =====
         // Un singur GestureDetector (taps) + un singur OnTouchListener (drag-uri).
-        // Stări dragMod: 0=none, 2=luminozitate(stânga), 1=volum(dreapta),
+        // Stări dragMod: 0=none, 1=luminozitate(stânga), 2=volum(dreapta),
         //                3=seek(orizontal), 4=scroll vertical (lăsat ViewPager2)
         val gesture = android.view.GestureDetector(
             context,
@@ -503,8 +503,8 @@ class VideoPagerAdapter(
                     val w = view.width.toFloat().coerceAtLeast(1f)
                     // zonă de pornire (folosită doar ca sugestie inițială; direcția decide definitiv la MOVE)
                     h.dragZona = when {
-                        event.x < w * 0.33f -> 2 // sugestie BRIGHTNESS (stânga)
-                        event.x > w * 0.66f -> 1 // sugestie VOLUME (dreapta)
+                        event.x < w * 0.33f -> 1 // sugestie BRIGHTNESS (stânga)
+                        event.x > w * 0.66f -> 2 // sugestie VOLUME (dreapta)
                         else -> 3                // sugestie SEEK (mijloc)
                     }
                     h.dragMod = 0 // nedecis încă — aștept prima mișcare ca să văd direcția dominantă
@@ -788,7 +788,6 @@ class VideoPagerAdapter(
     fun setVolume(v: Float) {
         currentVolume = v
         aplicaVolumSistem(currentVolume)
-        onVolumeChange?.invoke(currentVolume)
     }
     fun setBrightness(b: Float) {
         currentBrightness = b

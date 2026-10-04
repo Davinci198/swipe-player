@@ -712,7 +712,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             items = lista,
             initialVolume = volumCurent,
             onBrightnessChange = { aplicaLumina(it) },
-            onVolumeChange = {}
+            // Swipe-ul pe dreapta schimbă deja volumul sistemului în adapter;
+            // aici sincronizăm starea aplicației, sliderul și persistența.
+            onVolumeChange = { sincronizeazaVolumDinSwipe(it) }
         )
         nouAdapter.currentBrightness = luminozitateCurenta
         nouAdapter.currentVolume = volumCurent
@@ -756,6 +758,14 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         Toast.makeText(this, "S-au încărcat ${lista.size} videoclipuri", Toast.LENGTH_SHORT).show()
         setMod("video") // afișează pagerul de videoclipuri
         arataButonPipDacaAreLoc()
+    }
+
+    private fun sincronizeazaVolumDinSwipe(valoare: Float) {
+        volumCurent = valoare.coerceIn(0f, 1f)
+        if (::photoVolumeSeek.isInitialized) {
+            photoVolumeSeek.progress = (volumCurent * 1000).toInt()
+        }
+        salveazaSetarileCurente()
     }
 
     private fun aplicaLumina(valoare: Float) {
