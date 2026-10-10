@@ -50,7 +50,9 @@ class ThumbnailAdapter(
         val key = uri.toString()
         holder.pending = key
         holder.image.setImageDrawable(null)
-        holder.image.alpha = if (position == currentIndex) 1f else 0.55f
+        holder.itemView.isSelected = position == currentIndex
+        holder.image.alpha = if (position == currentIndex) 1f else 0.58f
+        holder.itemView.contentDescription = "Deschide poza ${position + 1}"
         holder.itemView.setOnClickListener { onClick(position) }
 
         loader.execute {

@@ -2,6 +2,14 @@
 <resources>
     <color name="ic_launcher_background">#FF0A0A0A</color>
     <color name="neon_red">#FFFF2A3D</color>
+    <color name="neon_red_soft">#26FF2A3D</color>
+    <color name="neon_amber">#FFFFB300</color>
     <color name="dark_premium">#FF08080A</color>
-    <color name="glass_border">#14FFFFFF</color>
+    <color name="surface_dark">#E60D0D12</color>
+    <color name="surface_dark_strong">#F20A0A0F</color>
+    <color name="surface_muted">#661C1C24</color>
+    <color name="glass_border">#28FFFFFF</color>
+    <color name="text_primary">#FFF8F8FA</color>
+    <color name="text_secondary">#B8C1CB</color>
+    <color name="text_tertiary">#88919C</color>
 </resources>

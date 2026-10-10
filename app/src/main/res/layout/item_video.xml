@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF050507"
+    android:background="@color/dark_premium"
     android:fitsSystemWindows="false"
     android:clipChildren="false"
     android:clipToPadding="false">
@@ -49,7 +49,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Loading video..."
-            android:textColor="#99FFFFFF"
+            android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:layout_marginTop="16dp" />
     </LinearLayout>
@@ -113,17 +113,23 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_gravity="bottom"
-        android:paddingStart="40dp"
-        android:paddingEnd="40dp"
-        android:paddingBottom="64dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="54dp"
+        android:paddingStart="18dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp"
+        android:background="@drawable/bg_seek_indicator"
         android:visibility="gone">
         <TextView
             android:id="@+id/seekTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0:00 / 0:00"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
             android:shadowColor="#000000"
             android:shadowRadius="4" />
         <ProgressBar
@@ -133,7 +139,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="16dp"
-            android:max="1000" />
+            android:max="100"
+            android:progressDrawable="@drawable/neon_progress_ff2a3d" />
     </LinearLayout>
 
     <!-- 3. Perdea/touch_catcher: ULTIMUL strat full-screen, DEASUPRA video si loading.
@@ -155,10 +162,20 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
-        android:layout_margin="24dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginBottom="22dp"
+        android:maxWidth="300dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:paddingStart="14dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="9dp"
         android:elevation="11dp"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
+        android:background="@drawable/bg_video_name"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold"
         android:shadowColor="#000000"
         android:shadowRadius="4" />
     <ImageButton
@@ -166,11 +183,14 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="top|end"
-        android:layout_margin="20dp"
+        android:layout_marginTop="88dp"
+        android:layout_marginEnd="20dp"
         android:elevation="11dp"
-        android:background="@android:color/transparent"
-        android:scaleType="fitCenter"
-        android:src="@android:drawable/btn_star_big_off" />
+        android:background="@drawable/bg_settings"
+        android:padding="11dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_favorite"
+        android:contentDescription="Adaugă videoclipul la favorite" />
 
     <!-- Butoane de derulare rapidă ⏪/⏩ (pas = N secunde configurat în Setări).
          Poziționate pe laturi la vertical-mijloc, SUS de zona nume-video/controller,
@@ -222,10 +242,10 @@
          bară verticală GALBENĂ, procent alb JOS (ca în demo) -->
     <LinearLayout
         android:id="@+id/brightnessOverlay"
-        android:layout_width="52dp"
-        android:layout_height="170dp"
+        android:layout_width="56dp"
+        android:layout_height="184dp"
         android:layout_gravity="center_vertical|start"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="14dp"
         android:background="@drawable/bg_overlay_dark"
         android:visibility="gone"
         android:orientation="vertical"
@@ -262,10 +282,10 @@
          bară verticală ROȘIE, procent alb JOS (ca în demo) -->
     <LinearLayout
         android:id="@+id/volumeOverlay"
-        android:layout_width="52dp"
-        android:layout_height="170dp"
+        android:layout_width="56dp"
+        android:layout_height="184dp"
         android:layout_gravity="center_vertical|end"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="14dp"
         android:background="@drawable/bg_overlay_dark"
         android:visibility="gone"
         android:orientation="vertical"

@@ -318,15 +318,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             photoFavBtn.visibility = View.GONE
             uiHandler.removeCallbacks(ascundeFotoCtrls)
         }
-        // evidențiază butonul activ
-        modeVideoBtn.setBackgroundColor(if (video) 0x33FFFFFF.toInt() else 0x00000000)
-        modePhotoBtn.setBackgroundColor(if (!video) 0x33FFFFFF.toInt() else 0x00000000)
+        // evidențiază butonul activ fără să piardă drawable-ul de stare
+        modeVideoBtn.isSelected = video
+        modePhotoBtn.isSelected = !video
         val status = if (video) {
             val n = adapter?.itemCount ?: videouri.size
-            if (n > 0) "🎬 $n videoclipuri" else "Niciun videoclip ales"
+            if (n > 0) "$n videoclipuri" else "Niciun videoclip ales"
         } else {
             val n = photoAdapter?.itemCount ?: poze.size
-            if (n > 0) "🖼️ $n poze" else "Nicio poză aleasă"
+            if (n > 0) "$n poze" else "Nicio poză aleasă"
         }
         tvStatus.text = status
     }
@@ -475,7 +475,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         imagePager.setCurrentItem(0, false)
         actualizeazaMiniaturi()
         setMod("photo")
-        tvStatus.text = "🖼️ ${lista.size} poze"
+        tvStatus.text = "${lista.size} poze"
         arataButonPipDacaAreLoc()
     }
 
@@ -621,7 +621,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             photoAdapter = null
             actualizeazaMiniaturi()
             setMod("video")
-            tvStatus.text = "Nu mai sunt poze. Adaugă din ⚙️"
+            tvStatus.text = "Nu mai sunt poze. Adaugă din Setări"
         } else {
             val nouPos = position.coerceIn(0, poze.size - 1)
             incarcaPoze(poze)
@@ -754,7 +754,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // aplică luminozitatea doar dacă e într-un interval rezonabil (bug sistem: nu forțăm 10%)
         if (luminozitateCurenta in 0.3f..1.0f) aplicaLumina(luminozitateCurenta)
         val st = MemoryManager.getInstance(this).getStatistici()
-        tvStatus.text = "🎬 ${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"
+        tvStatus.text = "${lista.size} videoclipuri • ${st["totalVizionari"]} vizionări"
         Toast.makeText(this, "S-au încărcat ${lista.size} videoclipuri", Toast.LENGTH_SHORT).show()
         setMod("video") // afișează pagerul de videoclipuri
         arataButonPipDacaAreLoc()
@@ -1082,7 +1082,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 actualizeazaMiniaturi()
                 viewPager.setCurrentItem(0, false)
                 imagePager.setCurrentItem(0, false)
-                tvStatus.text = "Bibliotecă golită. Alege fișiere din ⚙️"
+                tvStatus.text = "Bibliotecă golită. Alege fișiere din Setări"
                 setMod("video")
                 Toast.makeText(this, "Bibliotecă + istoric șterse", Toast.LENGTH_SHORT).show()
             }
