@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF050507">
+    android:background="@color/dark_premium">
 
     <!-- Poză full-screen, cu ZOOM in/out (pinch) + pan; se afișează COMPLET (fitCenter),
          fără trunchiere - barele negre apar doar la proporții diferite de ecran -->
@@ -19,5 +19,6 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:indeterminate="true"
+        android:indeterminateTint="@color/neon_red"
         android:layout_gravity="center" />
 </FrameLayout>

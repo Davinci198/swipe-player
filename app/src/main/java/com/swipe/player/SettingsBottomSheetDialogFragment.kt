@@ -2,7 +2,10 @@ package com.swipe.player
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +13,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.Switch
@@ -26,31 +30,18 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
     interface Listener {
-        /** slider luminozitate, aplicat în timp real (native de sistem, pe fereastră) */
         fun onBrightnessChange(brightness: Float)
-        /** slider volum, aplicat în timp real pe playerul activ */
         fun onVolumeChange(volume: Float)
-        /** schimbare rezoluție (Auto=0, 720, 1080) */
         fun onResolutieChange(resolutionH: Int)
-        /** schimbare secunde de derulare per swipe/buton (2..30) */
         fun onSeekStepChange(stepSec: Int)
-        /** redare în fundal: continuă sunetul la blocare/ieșire */
         fun onBackgroundPlayChange(activat: Boolean)
-        /** autoplay continuu la următorul videoclip */
         fun onAutoOrderChange(activat: Boolean)
-        /** șterge doar istoricul de vizionare (nu și fișierele locale) */
         fun onClearHistory()
-        /** reset la valori implicite */
         fun onReset()
-        /** alege videoclipuri din telefon (din setări) */
         fun onChooseVideos()
-        /** alege poze din telefon (din setări) */
         fun onChoosePhotos()
-        /** vizibilitatea butoanelor de control în modul VIDEO */
         fun onCtrlVideoChange(activat: Boolean)
-        /** vizibilitatea butoanelor de control în modul POZE */
         fun onCtrlPhotoChange(activat: Boolean)
-        /** vizibilitatea listelor de redare (miniaturi) */
         fun onPlaylistChange(activat: Boolean)
     }
 
@@ -92,39 +83,53 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         if (listener == null) listener = context as? Listener ?: activity as? Listener
     }
 
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.apply {
+            navigationBarColor = Color.rgb(12, 12, 17)
+            setDimAmount(0.64f)
+        }
+        dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            ?.setBackgroundColor(Color.TRANSPARENT)
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(64, 32, 64, 48)
+            setPadding(dp(24), dp(14), dp(24), dp(32))
         }
 
-        // ---- Titlu ----
+        root.addView(View(requireContext()).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(4).toFloat()
+                setColor(Color.rgb(110, 118, 128))
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(4)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(20)
+            }
+        })
+
         root.addView(TextView(requireContext()).apply {
-            text = "⚙️ Setări"
-            textSize = 20f
+            text = "Setări"
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
         })
 
-        // ---- Alegere fișiere (videoclipuri / poze) ----
         root.addView(label("Bibliotecă"))
-        root.addView(Button(requireContext()).apply {
-            text = "+ ALEGE VIDEOCLIPURI"
-            setOnClickListener {
-                listener?.onChooseVideos()
-                dismiss()
-            }
+        root.addView(actionButton("Alege videoclipuri") {
+            listener?.onChooseVideos()
+            dismiss()
         })
-        root.addView(Button(requireContext()).apply {
-            text = "+ ALEGE POZE (galerie)"
-            setOnClickListener {
-                listener?.onChoosePhotos()
-                dismiss()
-            }
+        root.addView(actionButton("Alege poze din galerie") {
+            listener?.onChoosePhotos()
+            dismiss()
         })
 
-        // ---- Redare (opțiuni on/off pentru comportamentul playerului) ----
         root.addView(label("Redare"))
         val rowBg = switchRow(
             title = "Redare în fundal",
@@ -141,35 +146,35 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         val swAuto = rowAuto.switch
         root.addView(rowAuto.view)
 
-        // ---- Vizibilitate butoane & liste (separat pe video/poze) ----
-        root.addView(label("Vizibilitate butoane & liste"))
+        root.addView(label("Vizibilitate butoane și liste"))
         val rowCtrlVideo = switchRow(
             title = "Video: butoane de control",
-            desc = "Afișează play/pause și derulare ⏪/⏩ la atingere, în modul Video.",
+            desc = "Afișează play/pause și derularea la atingere, în modul Video.",
             initial = currentCtrlVideo
         ) { activat -> listener?.onCtrlVideoChange(activat) }
         val swCtrlVideo = rowCtrlVideo.switch
         root.addView(rowCtrlVideo.view)
         val rowCtrlPhoto = switchRow(
             title = "Poze: butoane de control",
-            desc = "Afișează barele de luminozitate/volum și butoanele (redenumire/ștergere/favorit).",
+            desc = "Afișează luminozitatea, volumul, redenumirea, ștergerea și favoritele.",
             initial = currentCtrlPhoto
         ) { activat -> listener?.onCtrlPhotoChange(activat) }
         val swCtrlPhoto = rowCtrlPhoto.switch
         root.addView(rowCtrlPhoto.view)
         val rowPlaylist = switchRow(
             title = "Liste de redare (miniaturi)",
-            desc = "Afișează lista de navigare rapidă cu miniaturile videoclipurilor/pozelor.",
+            desc = "Afișează navigarea rapidă prin miniaturile pozelor.",
             initial = currentPlaylist
         ) { activat -> listener?.onPlaylistChange(activat) }
         val swPlaylist = rowPlaylist.switch
         root.addView(rowPlaylist.view)
 
-        // ---- Luminozitate (aplicată live, native de sistem) ----
-        root.addView(label("Luminozitate (live)"))
+        root.addView(label("Luminozitate live"))
         val seekLumina = SeekBar(requireContext()).apply {
             max = 1000
             progress = (currentBrightness * 1000).toInt()
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 179, 0))
+            thumbTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 179, 0))
             setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                     listener?.onBrightnessChange(progress / 1000f)
@@ -180,11 +185,12 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(seekLumina)
 
-        // ---- Volum (aplicat live pe playerul activ) ----
-        root.addView(label("Volum (live)"))
+        root.addView(label("Volum live"))
         val seekVolum = SeekBar(requireContext()).apply {
             max = 1000
             progress = (currentVolume * 1000).toInt()
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 42, 61))
+            thumbTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 42, 61))
             setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                     listener?.onVolumeChange(progress / 1000f)
@@ -195,7 +201,6 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(seekVolum)
 
-        // ---- Rezoluție (aplicată la schimbare) ----
         root.addView(label("Rezoluție"))
         val opts = listOf(
             Triple("Auto", 0, Int.MAX_VALUE to Int.MAX_VALUE),
@@ -205,12 +210,13 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         val radio = RadioGroup(requireContext()).apply {
             orientation = RadioGroup.VERTICAL
         }
-        val idRes = HashMap<Int, Int>() // id -> inaltime (0, 720, 1080)
-        opts.forEach { (nume, h, wh) ->
+        val idRes = HashMap<Int, Int>()
+        opts.forEach { (nume, h, _) ->
             val rb = RadioButton(requireContext()).apply {
                 text = nume
                 setTextColor(Color.WHITE)
                 id = View.generateViewId()
+                minHeight = dp(48)
             }
             radio.addView(rb)
             idRes[rb.id] = h
@@ -223,16 +229,16 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(radio)
 
-        // ---- Derulare (seek): secunde per swipe / buton ⏪⏩ (2..30) ----
-        root.addView(label("Secunde derulare (swipe & ⏪⏩)"))
+        root.addView(label("Secunde derulare (swipe)"))
         val txtSeekStep = TextView(requireContext()).apply {
             text = "${currentSeekStep} s"
             textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
         }
         root.addView(txtSeekStep)
         val seekStep = SeekBar(requireContext()).apply {
-            max = 28 // 2..30 => indiciu: progress+2
+            max = 28
             progress = currentSeekStep - 2
             setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -248,74 +254,117 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(seekStep)
 
-        // ---- Statistici de vizionare ----
         root.addView(label("Statistici"))
         run {
             val st = MemoryManager.getInstance(requireContext()).getStatistici()
             val difTotal = st["timpTotalSecunde"] as? Int ?: 0
             root.addView(TextView(requireContext()).apply {
                 text = """
-                    📹 Vizionări totale: ${st["totalVizionari"]}
-                    🎞️ Videoclipuri unice: ${st["videouriUnice"]}
-                    ⭐ Favorite: ${st["totalFavorite"]}
-                    ⏱️ Timp total vizionat: ${MemoryManager.getInstance(requireContext()).formateazaDurata(difTotal)}
+                    Vizionări totale: ${st["totalVizionari"]}
+                    Videoclipuri unice: ${st["videouriUnice"]}
+                    Favorite: ${st["totalFavorite"]}
+                    Timp total vizionat: ${MemoryManager.getInstance(requireContext()).formateazaDurata(difTotal)}
                 """.trimIndent()
                 textSize = 14f
                 setTextColor(Color.LTGRAY)
-                setPadding(0, 8, 0, 8)
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                background = requireContext().getDrawable(R.drawable.bg_stats_card)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             })
         }
 
-        // ---- Butoane ----
-        val btnClear = Button(requireContext()).apply {
-            text = "🧹 Șterge bibliotecă + istoric"
-            setOnClickListener { listener?.onClearHistory() }
-        }
-        root.addView(btnClear)
+        root.addView(label("Acțiuni"))
+        root.addView(actionButton("Șterge biblioteca + istoricul", destructive = true) {
+            listener?.onClearHistory()
+        })
 
-        val btnReset = Button(requireContext()).apply {
-            text = "Reset"
-            setOnClickListener {
-                currentBrightness = 1f; currentVolume = 1f; currentResH = 0
-                currentSeekStep = 10
-                currentBackgroundPlay = false
-                currentAutoOrder = true
-                currentCtrlVideo = true
-                currentCtrlPhoto = true
-                currentPlaylist = true
-                seekLumina.progress = 1000; seekVolum.progress = 1000
-                seekStep.progress = currentSeekStep - 2
-                txtSeekStep.text = "${currentSeekStep} s"
-                swBackground.isChecked = false
-                swAuto.isChecked = true
-                swCtrlVideo.isChecked = true
-                swCtrlPhoto.isChecked = true
-                swPlaylist.isChecked = true
-                listener?.onSeekStepChange(currentSeekStep)
-                listener?.onBackgroundPlayChange(false)
-                listener?.onAutoOrderChange(true)
-                listener?.onCtrlVideoChange(true)
-                listener?.onCtrlPhotoChange(true)
-                listener?.onPlaylistChange(true)
-                listener?.onReset()
-                Toast.makeText(requireContext(), "Setări resetate", Toast.LENGTH_SHORT).show()
-            }
+        val btnReset = actionButton("Resetează setările") {
+            currentBrightness = 1f; currentVolume = 1f; currentResH = 0
+            currentSeekStep = 10
+            currentBackgroundPlay = false
+            currentAutoOrder = true
+            currentCtrlVideo = true
+            currentCtrlPhoto = true
+            currentPlaylist = true
+            seekLumina.progress = 1000
+            seekVolum.progress = 1000
+            seekStep.progress = currentSeekStep - 2
+            txtSeekStep.text = "${currentSeekStep} s"
+            swBackground.isChecked = false
+            swAuto.isChecked = true
+            swCtrlVideo.isChecked = true
+            swCtrlPhoto.isChecked = true
+            swPlaylist.isChecked = true
+            listener?.onSeekStepChange(currentSeekStep)
+            listener?.onBackgroundPlayChange(false)
+            listener?.onAutoOrderChange(true)
+            listener?.onCtrlVideoChange(true)
+            listener?.onCtrlPhotoChange(true)
+            listener?.onPlaylistChange(true)
+            listener?.onReset()
+            Toast.makeText(requireContext(), "Setări resetate", Toast.LENGTH_SHORT).show()
         }
         root.addView(btnReset)
 
-        return root
+        return ScrollView(requireContext()).apply {
+            isFillViewport = true
+            setBackgroundResource(R.drawable.bg_settings_sheet)
+            addView(root)
+        }
     }
 
     private fun label(text: String): TextView = TextView(requireContext()).apply {
         this.text = text
-        textSize = 15f
-        setTextColor(Color.WHITE)
+        textSize = 13f
+        typeface = Typeface.DEFAULT_BOLD
+        setTextColor(Color.rgb(255, 112, 124))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(20)
+            bottomMargin = dp(8)
+        }
     }
 
-    /**
-     * Rând de setare on/off (switch) cu titlu + descriere.
-     * Returnează [SwitchRow] cu referințele la view și switch (pentru Reset).
-     */
+    private fun actionButton(
+        text: String,
+        destructive: Boolean = false,
+        onClick: () -> Unit
+    ): Button = Button(requireContext()).apply {
+        this.text = text
+        isAllCaps = false
+        textSize = 14f
+        typeface = Typeface.DEFAULT_BOLD
+        gravity = Gravity.CENTER
+        minHeight = dp(52)
+        minimumHeight = dp(52)
+        setTextColor(Color.WHITE)
+        setPadding(dp(18), 0, dp(18), 0)
+        val buttonSurface = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(16).toFloat()
+            setColor(if (destructive) Color.rgb(80, 20, 28) else Color.rgb(30, 30, 39))
+            setStroke(dp(1), if (destructive) Color.rgb(255, 76, 92) else Color.rgb(72, 72, 84))
+        }
+        background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(Color.argb(48, 255, 255, 255)),
+            buttonSurface,
+            null
+        )
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(8)
+        }
+        setOnClickListener { onClick() }
+    }
+
+    /** Rând de setare on/off cu titlu + descriere. */
     private fun switchRow(
         title: String,
         desc: String,
@@ -324,6 +373,7 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     ): SwitchRow {
         val sw = Switch(requireContext()).apply {
             isChecked = initial
+            minWidth = dp(52)
             setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
         }
         val txtCol = LinearLayout(requireContext()).apply {
@@ -333,6 +383,7 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         txtCol.addView(TextView(requireContext()).apply {
             text = title
             textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
         })
         if (desc.isNotBlank()) {
@@ -340,21 +391,28 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 text = desc
                 textSize = 12f
                 setTextColor(Color.LTGRAY)
+                setPadding(0, dp(3), 0, 0)
             })
         }
         val row = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, 8, 0, 8)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(10), dp(12))
+            background = requireContext().getDrawable(R.drawable.bg_settings_row)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            ).apply {
+                bottomMargin = dp(8)
+            }
         }
         row.addView(txtCol)
         row.addView(sw)
         return SwitchRow(row, sw)
     }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt().coerceAtLeast(1)
 
     private class SwitchRow(val view: View, val switch: Switch)
 }

@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="64dp"
-    android:layout_height="72dp"
-    android:layout_marginEnd="6dp"
-    android:background="#22000000">
+    android:layout_width="72dp"
+    android:layout_height="78dp"
+    android:layout_marginEnd="8dp"
+    android:padding="2dp"
+    android:background="@drawable/bg_thumb_selector"
+    android:clipChildren="true"
+    android:clipToPadding="true">
 
     <ImageView
         android:id="@+id/thumbImg"
@@ -11,5 +14,5 @@
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
         android:adjustViewBounds="false"
-        android:contentDescription="Miniatură" />
+        android:contentDescription="Miniatură foto" />
 </FrameLayout>

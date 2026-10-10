@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.SwipePlayer" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="android:statusBarColor">#FF08080A</item>
-        <item name="android:navigationBarColor">#FF08080A</item>
-        <item name="colorPrimary">#FFFF2A3D</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:statusBarColor">@color/dark_premium</item>
+        <item name="android:navigationBarColor">@color/dark_premium</item>
+        <item name="android:navigationBarDividerColor">@color/dark_premium</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="colorPrimary">@color/neon_red</item>
+        <item name="colorAccent">@color/neon_red</item>
+        <item name="android:colorAccent">@color/neon_red</item>
     </style>
 </resources>

@@ -1,219 +1,244 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF08080A">
+    android:background="@color/dark_premium">
 
-    <!-- Pager VIDEOCLIPURI (swipe vertical). Folosește marginile stânga/dreapta pentru luminozitate/volum. -->
+    <!-- Playerul ocupă tot ecranul; controalele rămân peste conținut. -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- Pager POZE (swipe vertical). Marginea de jos = înălțimea panoului foto (miniaturi + controale). -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/imagePager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="136dp"
+        android:layout_marginBottom="160dp"
         android:visibility="gone" />
 
-    <!-- Header: comutator mod (Video / Poze) + status -->
+    <!-- Header compact: mod activ + status, fără să concureze cu media. -->
     <LinearLayout
         android:id="@+id/headerOverlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
         android:layout_gravity="top"
-        android:background="@drawable/bg_top_overlay">
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="18dp"
+        android:background="@drawable/bg_top_overlay"
+        android:elevation="6dp">
+
         <LinearLayout
+            android:id="@+id/modeSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="#33FFFFFF"
-            android:padding="6dp">
+            android:padding="4dp"
+            android:background="@drawable/bg_mode_switch">
+
             <TextView
                 android:id="@+id/modeVideoBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🎬 Video"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:background="#33FFFFFF" />
+                android:layout_width="104dp"
+                android:layout_height="48dp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:drawableStart="@drawable/ic_video"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/mode_button_text"
+                android:text="Video"
+                android:textColor="@color/mode_button_text"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_mode_button"
+                android:contentDescription="Mod Video" />
+
             <TextView
                 android:id="@+id/modePhotoBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🖼️ Poze"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp" />
+                android:layout_width="104dp"
+                android:layout_height="48dp"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:drawableStart="@drawable/ic_photo"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/mode_button_text"
+                android:text="Poze"
+                android:textColor="@color/mode_button_text"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_mode_button"
+                android:contentDescription="Mod Poze" />
         </LinearLayout>
+
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Alege fișiere din ⚙️ Setări"
-            android:textColor="#DDFFFFFF"
-            android:textSize="13sp"
-            android:layout_marginTop="6dp" />
+            android:layout_marginTop="10dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Alege fișiere din Setări"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- Creion REDENUMIRE poză -->
+    <!-- Acțiuni foto, aliniate sub header pentru a evita suprapunerea cu Setări. -->
     <ImageButton
         android:id="@+id/photoRenameBtn"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="88dp"
+        android:layout_marginTop="94dp"
         android:layout_marginEnd="20dp"
         android:background="@drawable/bg_settings"
         android:src="@drawable/ic_pencil"
         android:scaleType="centerInside"
-        android:padding="9dp"
+        android:padding="11dp"
         android:contentDescription="Redenumește poza"
         android:visibility="gone" />
 
-    <!-- Buton ȘTERGERE poză -->
     <ImageButton
         android:id="@+id/photoDeleteBtn"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="144dp"
+        android:layout_marginTop="150dp"
         android:layout_marginEnd="20dp"
         android:background="@drawable/bg_settings"
         android:src="@drawable/ic_delete"
         android:scaleType="centerInside"
-        android:padding="9dp"
+        android:padding="11dp"
         android:contentDescription="Șterge poza"
         android:visibility="gone" />
 
-    <!-- Buton FAVORIT poză -->
     <ImageButton
         android:id="@+id/photoFavBtn"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="200dp"
+        android:layout_marginTop="206dp"
         android:layout_marginEnd="20dp"
         android:background="@drawable/bg_settings"
         android:src="@drawable/ic_favorite"
         android:scaleType="centerInside"
-        android:padding="9dp"
-        android:contentDescription="Favorit"
+        android:padding="11dp"
+        android:contentDescription="Adaugă la favorite"
         android:visibility="gone" />
 
-    <!-- Panoul FOTO (jos, doar modul Poze): controale + miniaturi -->
+    <!-- Panoul galeriei: suprafață ridicată, separată clar de conținut. -->
     <LinearLayout
         android:id="@+id/photoBottomPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:background="#E60A0A0D"
+        android:paddingTop="8dp"
+        android:background="@drawable/bg_photo_panel"
+        android:elevation="8dp"
         android:visibility="gone">
 
-        <!-- Rând controale luminozitate + volum -->
         <LinearLayout
             android:id="@+id/photoControlsBar"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="☀️"
-                android:textSize="16sp" />
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_brightness"
+                android:tint="@color/neon_amber"
+                android:contentDescription="Luminozitate" />
+
             <SeekBar
                 android:id="@+id/photoBrightnessSeek"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:max="1000" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:text="🔊"
-                android:textSize="16sp" />
+                android:layout_marginStart="8dp"
+                android:max="1000"
+                android:splitTrack="false"
+                android:progressTint="@color/neon_amber"
+                android:thumbTint="@color/neon_amber" />
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="18dp"
+                android:src="@drawable/ic_volume"
+                android:tint="@color/neon_red"
+                android:contentDescription="Volum" />
+
             <SeekBar
                 android:id="@+id/photoVolumeSeek"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:max="1000" />
+                android:layout_marginStart="8dp"
+                android:max="1000"
+                android:splitTrack="false"
+                android:progressTint="@color/neon_red"
+                android:thumbTint="@color/neon_red" />
         </LinearLayout>
 
-        <!-- Miniaturi pentru navigare rapidă -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/photoThumbStrip"
             android:layout_width="match_parent"
-            android:layout_height="92dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
+            android:layout_height="96dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="10dp"
             android:clipToPadding="false"
             android:scrollbars="none" />
     </LinearLayout>
 
-    <!-- Buton setari: colț dreapta sus -->
-    <ImageButton
-        android:id="@+id/btnSettings"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_gravity="top|end"
-        android:layout_margin="16dp"
-        android:contentDescription="Setări"
-        android:background="@drawable/bg_settings"
-        android:src="@android:drawable/ic_menu_manage"
-        android:scaleType="centerInside"
-        android:padding="12dp"
-        android:elevation="8dp"
-        android:alpha="0.92" />
-
-    <!-- Buton Picture-in-Picture -->
     <ImageButton
         android:id="@+id/btnPip"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="top|end"
         android:layout_marginTop="16dp"
-        android:layout_marginEnd="80dp"
+        android:layout_marginEnd="76dp"
         android:contentDescription="Redare în fereastră (PiP)"
         android:background="@drawable/bg_settings"
-        android:src="@android:drawable/ic_menu_slideshow"
+        android:src="@drawable/ic_pip"
         android:scaleType="centerInside"
-        android:padding="12dp"
-        android:elevation="8dp"
-        android:alpha="0.92"
+        android:padding="11dp"
+        android:elevation="10dp"
         android:visibility="gone" />
 
-    <!-- Timeline neon chapters -->
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="20dp"
+        android:contentDescription="Deschide setările"
+        android:background="@drawable/bg_settings"
+        android:src="@drawable/ic_settings"
+        android:scaleType="centerInside"
+        android:padding="11dp"
+        android:elevation="10dp" />
+
     <com.swipe.player.TimelineChaptersView
         android:id="@+id/timelineView"
         android:layout_width="match_parent"
         android:layout_height="32dp"
         android:layout_gravity="bottom"
-        android:layout_marginBottom="24dp"
-        android:layout_marginHorizontal="16dp" />
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="18dp" />
 
 </FrameLayout>
