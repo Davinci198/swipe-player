@@ -598,31 +598,46 @@ class VideoPagerAdapter(
             }
         }
 
+        fun setFavoriteVisual(isFavorite: Boolean) {
+            holder.btnFav.setImageResource(R.drawable.ic_favorite)
+            holder.btnFav.alpha = if (isFavorite) 1f else 0.45f
+            holder.btnFav.contentDescription = if (isFavorite) {
+                "Elimină videoclipul din favorite"
+            } else {
+                "Adaugă videoclipul la favorite"
+            }
+        }
+
         val esteFav = memoryManager.esteFavorit(videoName)
-        holder.btnFav.setImageResource(if (esteFav) android.R.drawable.star_on else android.R.drawable.star_off)
+        setFavoriteVisual(esteFav)
         holder.btnFav.setOnClickListener {
-            val ac = memoryManager.toggleFavorite(videoName, (player.duration / 1000).toInt())
-            holder.btnFav.setImageResource(if (ac) android.R.drawable.star_on else android.R.drawable.star_off)
+            val durataSecunde = (player.duration / 1000L).coerceAtLeast(0L).toInt()
+            val ac = memoryManager.toggleFavorite(videoName, durataSecunde)
+            setFavoriteVisual(ac)
         }
 
         // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări).
         // Implicit ASCUNSE; apar doar împreună cu controllerul media (la atingere).
-        val secMs = seekStepSec.coerceIn(2, 30) * 1000L
         holder.btnSeekBack.visibility = View.GONE
         holder.btnSeekFwd.visibility = View.GONE
-        // #90: butoane dezactivate (gone în layout) — blocuri comentate ca să nu mai fie apelate
-        // holder.btnSeekBack.setOnClickListener {
-        //     val d = player.duration.coerceAtLeast(0L)
-        //     val target = (player.currentPosition - secMs).coerceIn(0L, d)
-        //     player.seekTo(target)
-        //     if (d > 0) showSeekIndicator(holder, target, d)
-        // }
-        // holder.btnSeekFwd.setOnClickListener {
-        //     val d = player.duration.coerceAtLeast(0L)
-        //     val target = (player.currentPosition + secMs).coerceIn(0L, d)
-        //     player.seekTo(target)
-        //     if (d > 0) showSeekIndicator(holder, target, d)
-        // }
+        holder.btnSeekBack.isClickable = true
+        holder.btnSeekFwd.isClickable = true
+        holder.btnSeekBack.setOnClickListener {
+            val durata = player.duration.coerceAtLeast(0L)
+            if (durata <= 0L) return@setOnClickListener
+            val delta = seekStepSec.coerceIn(2, 30) * 1000L
+            val target = (player.currentPosition - delta).coerceIn(0L, durata)
+            player.seekTo(target)
+            showSeekIndicator(holder, target, durata)
+        }
+        holder.btnSeekFwd.setOnClickListener {
+            val durata = player.duration.coerceAtLeast(0L)
+            if (durata <= 0L) return@setOnClickListener
+            val delta = seekStepSec.coerceIn(2, 30) * 1000L
+            val target = (player.currentPosition + delta).coerceIn(0L, durata)
+            player.seekTo(target)
+            showSeekIndicator(holder, target, durata)
+        }
 
     }
 

@@ -207,7 +207,8 @@
         android:scaleType="fitCenter"
         android:contentDescription="Înapoi"
         android:visibility="gone"
-        android:clickable="false"
+        android:clickable="true"
+        android:focusable="true"
         android:src="@android:drawable/ic_media_rew" />
     <ImageButton
         android:id="@+id/btnSeekFwd"
@@ -220,7 +221,8 @@
         android:scaleType="fitCenter"
         android:contentDescription="Înainte"
         android:visibility="gone"
-        android:clickable="false"
+        android:clickable="true"
+        android:focusable="true"
         android:src="@android:drawable/ic_media_ff" />
 
     <!-- ============================================================

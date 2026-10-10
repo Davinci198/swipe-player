@@ -304,6 +304,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         // panoul foto (miniaturi + controale) + creionul — DOAR în modul Poze
         if (!video) {
             photoBottomPanel.visibility = View.VISIBLE
+            photoControlsBar.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
             photoRenameBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
             photoDeleteBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
             photoFavBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
@@ -919,6 +920,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             findViewById<View>(R.id.headerOverlay).visibility = View.VISIBLE
             if (modCurent == "photo") {
                 findViewById<View>(R.id.photoBottomPanel).visibility = View.VISIBLE
+                photoControlsBar.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+                photoRenameBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+                photoDeleteBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+                photoFavBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
+                photoThumbStrip.visibility = if (playlistVizibil) View.VISIBLE else View.GONE
+                if (ctrlPhotoVizibil) afiseazaControaleFoto()
             }
         }
     }
@@ -1040,6 +1047,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             photoRenameBtn.visibility = View.GONE
             photoDeleteBtn.visibility = View.GONE
             photoFavBtn.visibility = View.GONE
+        } else if (modCurent == "photo") {
+            afiseazaControaleFoto()
         }
         salveazaSetarileCurente()
     }
