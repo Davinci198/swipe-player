@@ -442,9 +442,11 @@ class VideoPagerAdapter(
                     val noul = !holder.controllerVisibil
                     if (noul) {
                         holder.playerView.showController()
-                        holder.btnSeekBack.visibility = View.VISIBLE
-                        holder.btnSeekFwd.visibility = View.VISIBLE
-                        // butoanele dispar automat împreună cu controllerul (după timeout)
+                        // Derularea rămâne disponibilă prin swipe orizontal; nu afișăm
+                        // butoane laterale peste zona de swipe verticală.
+                        holder.btnSeekBack.visibility = View.GONE
+                        holder.btnSeekFwd.visibility = View.GONE
+                        // controllerul dispare automat după timeout
                         holder.itemView.removeCallbacks(hideButtons)
                         holder.itemView.postDelayed(hideButtons, CTRL_TIMEOUT_MS)
                     } else {
@@ -503,14 +505,15 @@ class VideoPagerAdapter(
                     val w = view.width.toFloat().coerceAtLeast(1f)
                     // zonă de pornire (folosită doar ca sugestie inițială; direcția decide definitiv la MOVE)
                     h.dragZona = when {
-                        event.x < w * 0.33f -> 1 // sugestie BRIGHTNESS (stânga)
-                        event.x > w * 0.66f -> 2 // sugestie VOLUME (dreapta)
+                        event.x < w * 0.22f -> 1 // sugestie BRIGHTNESS (marginea stângă)
+                        event.x > w * 0.78f -> 2 // sugestie VOLUME (marginea dreaptă)
                         else -> 3                // sugestie SEEK (mijloc)
                     }
                     h.dragMod = 0 // nedecis încă — aștept prima mișcare ca să văd direcția dominantă
                     Log.d("GESTURE", "DOWN x=${"%.0f".format(event.x)} w=${"%.0f".format(w)} zona=${h.dragZona}")
-                    // blochez scroll-ul ViewPager pe durata gestului
-                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                    // Nu blocăm ViewPager2 încă. El trebuie să poată prelua un swipe
+                    // vertical; interceptarea se dezactivează doar după confirmarea
+                    // unui gest de volum/luminozitate sau seek orizontal.
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -519,9 +522,10 @@ class VideoPagerAdapter(
                     val dy = event.y - h.dragStartY
                     val w87 = view.width.toFloat().coerceAtLeast(1f)
                     if (h.dragMod == 0) {
-                        val isRight = h.dragStartX > w87 * 0.60f
-                        val isLeft = h.dragStartX < w87 * 0.40f
-                        // VOLUM/BRIGHTNESS: prioritate maxima pe margini, chiar și cu dx mare
+                        val isRight = h.dragStartX > w87 * 0.78f
+                        val isLeft = h.dragStartX < w87 * 0.22f
+                        // VOLUM/BRIGHTNESS: doar pe marginile reale, ca centrul să rămână
+                        // liber pentru swipe-ul vertical dintre videoclipuri.
                         if (isRight && Math.abs(dy) > 8) {
                             h.dragMod = 2
                         } else if (isLeft && Math.abs(dy) > 8) {
@@ -531,13 +535,12 @@ class VideoPagerAdapter(
                             // ACTION_DOWN a fost deja consumat de overlay; un return false
                             // ulterior nu pasează automat gestul către ViewPager2. Eliberăm
                             // interceptarea, iar părintele va prelua următorul MOVE.
-                            view.parent?.requestDisallowInterceptTouchEvent(false)
+                            requestDisallowIntercept(view, false)
                             return@setOnTouchListener true
                         } else if (Math.abs(dx) > 12) {
                             h.dragMod = 3 // seek orizontal
                             // anti-furt ViewPager2: reconfirmăm intercept pe TOȚI părinții ca seek-ul să nu fie furat
-                            var p = view.parent
-                            while (p != null) { p.requestDisallowInterceptTouchEvent(true); p = p.parent }
+                            requestDisallowIntercept(view, true)
                         }
                     }
                     if (h.dragMod == 4) return@setOnTouchListener true
@@ -577,7 +580,7 @@ class VideoPagerAdapter(
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (h.dragMod == 4) {
                         h.dragMod = 0
-                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                        requestDisallowIntercept(view, false)
                         return@setOnTouchListener true
                     }
                     // seek REAL o singură dată, la ridicarea degetului (nu la fiecare move)
@@ -591,38 +594,35 @@ class VideoPagerAdapter(
                     h.dragMod = 0
                     h.dragZona = 0
                     h.seekActive = false
-                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                    requestDisallowIntercept(view, false)
                     true
                 }
                 else -> true
             }
         }
 
+        fun setFavoriteVisual(isFavorite: Boolean) {
+            holder.btnFav.setImageResource(R.drawable.ic_favorite)
+            holder.btnFav.alpha = if (isFavorite) 1f else 0.45f
+            holder.btnFav.contentDescription = if (isFavorite) {
+                "Elimină videoclipul din favorite"
+            } else {
+                "Adaugă videoclipul la favorite"
+            }
+        }
+
         val esteFav = memoryManager.esteFavorit(videoName)
-        holder.btnFav.setImageResource(if (esteFav) android.R.drawable.star_on else android.R.drawable.star_off)
+        setFavoriteVisual(esteFav)
         holder.btnFav.setOnClickListener {
-            val ac = memoryManager.toggleFavorite(videoName, (player.duration / 1000).toInt())
-            holder.btnFav.setImageResource(if (ac) android.R.drawable.star_on else android.R.drawable.star_off)
+            val durataSecunde = (player.duration / 1000L).coerceAtLeast(0L).toInt()
+            val ac = memoryManager.toggleFavorite(videoName, durataSecunde)
+            setFavoriteVisual(ac)
         }
 
         // Butoane ⏪ / ⏩ de derulare rapidă: pas = seekStepSec (configurat în Setări).
         // Implicit ASCUNSE; apar doar împreună cu controllerul media (la atingere).
-        val secMs = seekStepSec.coerceIn(2, 30) * 1000L
         holder.btnSeekBack.visibility = View.GONE
         holder.btnSeekFwd.visibility = View.GONE
-        // #90: butoane dezactivate (gone în layout) — blocuri comentate ca să nu mai fie apelate
-        // holder.btnSeekBack.setOnClickListener {
-        //     val d = player.duration.coerceAtLeast(0L)
-        //     val target = (player.currentPosition - secMs).coerceIn(0L, d)
-        //     player.seekTo(target)
-        //     if (d > 0) showSeekIndicator(holder, target, d)
-        // }
-        // holder.btnSeekFwd.setOnClickListener {
-        //     val d = player.duration.coerceAtLeast(0L)
-        //     val target = (player.currentPosition + secMs).coerceIn(0L, d)
-        //     player.seekTo(target)
-        //     if (d > 0) showSeekIndicator(holder, target, d)
-        // }
 
     }
 
@@ -664,6 +664,15 @@ class VideoPagerAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
+    private fun requestDisallowIntercept(view: View, disallow: Boolean) {
+        var parent = view.parent
+        while (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(disallow)
+            parent = parent.parent
+        }
+    }
+
     private fun salveazaProgresDacaTimpul(nume: String, player: ExoPlayer) {
         val acum = System.currentTimeMillis()
         if (acum - lastSaveTime < 5000) return

@@ -208,6 +208,7 @@
         android:contentDescription="Înapoi"
         android:visibility="gone"
         android:clickable="false"
+        android:focusable="false"
         android:src="@android:drawable/ic_media_rew" />
     <ImageButton
         android:id="@+id/btnSeekFwd"
@@ -221,6 +222,7 @@
         android:contentDescription="Înainte"
         android:visibility="gone"
         android:clickable="false"
+        android:focusable="false"
         android:src="@android:drawable/ic_media_ff" />
 
     <!-- ============================================================

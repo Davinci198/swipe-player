@@ -13,12 +13,13 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
-import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.widget.NestedScrollView
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 /**
@@ -90,7 +91,13 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             setDimAmount(0.64f)
         }
         dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-            ?.setBackgroundColor(Color.TRANSPARENT)
+            ?.let { bottomSheet ->
+                bottomSheet.setBackgroundColor(Color.TRANSPARENT)
+                BottomSheetBehavior.from(bottomSheet).apply {
+                    state = BottomSheetBehavior.STATE_EXPANDED
+                    skipCollapsed = true
+                }
+            }
     }
 
     override fun onCreateView(
@@ -309,8 +316,10 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
         root.addView(btnReset)
 
-        return ScrollView(requireContext()).apply {
+        return NestedScrollView(requireContext()).apply {
             isFillViewport = true
+            isNestedScrollingEnabled = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             setBackgroundResource(R.drawable.bg_settings_sheet)
             addView(root)
         }
