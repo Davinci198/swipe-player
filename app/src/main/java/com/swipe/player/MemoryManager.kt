@@ -61,6 +61,7 @@ class MemoryManager private constructor(context: Context) {
      * @param durataSecunde durata totală în secunde
      */
     fun salveazaInIstoric(
+        id: String,
         nume: String,
         progres: Int,
         pozitieSecunde: Int,
@@ -73,9 +74,10 @@ class MemoryManager private constructor(context: Context) {
             // UPSERT: dacă videoul există deja, actualizăm poziția (nu append negrăbit)
             var index = -1
             for (i in 0 until arr.length()) {
-                if (arr.getJSONObject(i).optString("nume", "") == nume) { index = i; break }
+                if (arr.getJSONObject(i).optString("id", "") == id) { index = i; break }
             }
             val entry = JSONObject().apply {
+                put("id", id)
                 put("nume", nume)
                 put("data", data)
                 put("progres", progres.coerceIn(0, 100))
@@ -98,23 +100,22 @@ class MemoryManager private constructor(context: Context) {
 
     /**
      * Returnează istoricul ca listă de map-uri.
-     * @param query opțional, filtrează după nume (case-insensitive)
+     * @param id opțional, filtrează după identificatorul stabil al URI-ului
      */
-    fun getIstoric(query: String? = null): List<Map<String, Any?>> {
+    fun getIstoric(id: String? = null): List<Map<String, Any?>> {
         return try {
             val arr = getJsonArray(KEY_HISTORY)
             val results = mutableListOf<Map<String, Any?>>()
-            val lowerQuery = query?.lowercase(Locale.ROOT)
-
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val nume = obj.optString("nume", "")
 
-                if (lowerQuery != null && !nume.lowercase(Locale.ROOT).contains(lowerQuery)) {
+                if (id != null && obj.optString("id", "") != id) {
                     continue
                 }
 
                 results.add(mapOf(
+                    "id" to obj.optString("id", ""),
                     "nume" to nume,
                     "data" to obj.optString("data", ""),
                     "progres" to obj.optInt("progres", 0),
@@ -128,6 +129,10 @@ class MemoryManager private constructor(context: Context) {
             emptyList()
         }
     }
+
+    /** Migrează o intrare veche bazată pe nume doar când asocierea este unică. */
+    fun migreazaIstoricLegacy(id: String, nume: String): Boolean =
+        migreazaId(KEY_HISTORY, id, nume)
 
     /**
      * Șterge o intrare din istoric după index.
@@ -161,10 +166,10 @@ class MemoryManager private constructor(context: Context) {
     /**
      * Adaugă sau elimină un video din favorite. Returnează true dacă a devenit favorit.
      */
-    fun toggleFavorite(nume: String, durataSecunde: Int = 0): Boolean {
+    fun toggleFavorite(id: String, nume: String, durataSecunde: Int = 0): Boolean {
         return try {
             val arr = getJsonArray(KEY_FAVORITES)
-            val existingIndex = findFavoriteIndex(arr, nume)
+            val existingIndex = findFavoriteIndex(arr, id)
 
             if (existingIndex >= 0) {
                 arr.remove(existingIndex)
@@ -173,6 +178,7 @@ class MemoryManager private constructor(context: Context) {
                 false
             } else {
                 val entry = JSONObject().apply {
+                    put("id", id)
                     put("nume", nume)
                     put("data", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()))
                     put("durata", durataSecunde)
@@ -191,14 +197,18 @@ class MemoryManager private constructor(context: Context) {
     /**
      * Verifică dacă un video este favorit.
      */
-    fun esteFavorit(nume: String): Boolean {
+    fun esteFavorit(id: String): Boolean {
         return try {
             val arr = getJsonArray(KEY_FAVORITES)
-            findFavoriteIndex(arr, nume) >= 0
+            findFavoriteIndex(arr, id) >= 0
         } catch (e: Exception) {
             false
         }
     }
+
+    /** Migrează un favorit vechi bazat pe nume doar când asocierea este unică. */
+    fun migreazaFavoritLegacy(id: String, nume: String): Boolean =
+        migreazaId(KEY_FAVORITES, id, nume)
 
     /**
      * Returnează lista de favorite.
@@ -210,6 +220,7 @@ class MemoryManager private constructor(context: Context) {
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 results.add(mapOf(
+                    "id" to obj.optString("id", ""),
                     "nume" to obj.optString("nume", ""),
                     "data" to obj.optString("data", ""),
                     "durata" to obj.optInt("durata", 0)
@@ -222,12 +233,12 @@ class MemoryManager private constructor(context: Context) {
     }
 
     /**
-     * Elimină un favorit după nume.
+     * Elimină un favorit după identificatorul stabil al URI-ului.
      */
-    fun eliminaFavorit(nume: String): Boolean {
+    fun eliminaFavorit(id: String): Boolean {
         return try {
             val arr = getJsonArray(KEY_FAVORITES)
-            val idx = findFavoriteIndex(arr, nume)
+            val idx = findFavoriteIndex(arr, id)
             if (idx >= 0) {
                 arr.remove(idx)
                 putJsonArray(KEY_FAVORITES, arr)
@@ -238,13 +249,30 @@ class MemoryManager private constructor(context: Context) {
         }
     }
 
-    private fun findFavoriteIndex(arr: JSONArray, nume: String): Int {
+    private fun findFavoriteIndex(arr: JSONArray, id: String): Int {
         for (i in 0 until arr.length()) {
-            if (arr.getJSONObject(i).optString("nume", "") == nume) {
+            if (arr.getJSONObject(i).optString("id", "") == id) {
                 return i
             }
         }
         return -1
+    }
+
+    private fun migreazaId(key: String, id: String, nume: String): Boolean {
+        return try {
+            val arr = getJsonArray(key)
+            val matches = (0 until arr.length()).filter { index ->
+                val obj = arr.getJSONObject(index)
+                obj.optString("id", "").isBlank() && obj.optString("nume", "") == nume
+            }
+            if (matches.size != 1) return false
+            arr.getJSONObject(matches.single()).put("id", id)
+            putJsonArray(key, arr)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare migrare identificator media", e)
+            false
+        }
     }
 
     // =============================================
@@ -386,17 +414,19 @@ class MemoryManager private constructor(context: Context) {
         val istoric = getIstoric()
         val favs = getFavorite()
 
-        val numeUnice = mutableSetOf<String>()
+        val mediaUnice = mutableSetOf<String>()
         var timpTotal = 0
         for (entry in istoric) {
             val nume = entry["nume"] as? String ?: ""
-            if (nume.isNotBlank()) numeUnice.add(nume)
+            val id = entry["id"] as? String
+            val key = id?.takeIf { it.isNotBlank() } ?: nume
+            if (key.isNotBlank()) mediaUnice.add(key)
             timpTotal += (entry["durata"] as? Int) ?: 0
         }
 
         return mapOf(
             "totalVizionari" to istoric.size,
-            "videouriUnice" to numeUnice.size,
+            "videouriUnice" to mediaUnice.size,
             "totalFavorite" to favs.size,
             "timpTotalSecunde" to timpTotal
         )

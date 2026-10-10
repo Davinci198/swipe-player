@@ -79,6 +79,17 @@ class VideoPagerAdapter(
     // holder-ul viu pentru fiecare player aflat în uz (folosit de listenerul per player)
     private val playerHolder = HashMap<ExoPlayer, VH>()
 
+    private val progressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val progressCheckpoint = object : Runnable {
+        override fun run() {
+            val p = playerActiv
+            if (p?.isPlaying == true) {
+                salveazaProgres(numePentru(p), p, null)
+                progressHandler.postDelayed(this, 5_000L)
+            }
+        }
+    }
+
     // pool de ExoPlayer refolosiți (evită crearea a 100+ jucători pt. 100 de videoclipuri)
     private val pool = java.util.ArrayDeque<ExoPlayer>()
     private val MAX_POOL = 3
@@ -139,6 +150,9 @@ class VideoPagerAdapter(
         return if (poz in 0 until names.size) names[poz] else "Video"
     }
 
+    private fun idPentru(position: Int): String =
+        items.getOrNull(position)?.let { uri -> mediaId(uri) } ?: ""
+
     // Wrapper de listener PER PLAYER, atașat o singură dată la crearea playerului.
     // Închide DOAR lucruri stabile (acest [p] și adapterul [this]), nu holder/nume per
     // bind, deci la reutilizarea din pool NU se acumulează listeners și NU se scrie
@@ -184,6 +198,12 @@ class VideoPagerAdapter(
         }
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) salveazaProgresDacaTimpul(numePentru(p), p)
+            if (isPlaying) {
+                progressHandler.removeCallbacks(progressCheckpoint)
+                progressHandler.postDelayed(progressCheckpoint, 5_000L)
+            } else {
+                progressHandler.removeCallbacks(progressCheckpoint)
+            }
         }
         override fun onPositionDiscontinuity(reason: Int) {
             salveazaProgresDacaTimpul(numePentru(p), p)
@@ -215,6 +235,14 @@ class VideoPagerAdapter(
      */
     fun elibereazaTot() {
         try {
+            progressHandler.removeCallbacks(progressCheckpoint)
+            for (p in live.values) {
+                salveazaProgres(numePentru(p), p, null)
+            }
+            for (holder in playerHolder.values) {
+                holder.playerView.player = null
+                holder.player = null
+            }
             val toti = LinkedHashSet<ExoPlayer>().apply { addAll(live.values); addAll(pool) }
             for (p in toti) {
                 try {
@@ -248,8 +276,10 @@ class VideoPagerAdapter(
      * Nu distruge playerii, doar îi pune în pauză și taie sunetul.
      */
     fun pauseAllPlayers() {
-        for (p in allPlayers()) {
+        progressHandler.removeCallbacks(progressCheckpoint)
+        for (p in live.values) {
             try {
+                salveazaProgres(numePentru(p), p, null)
                 p.playWhenReady = false
                 p.volume = 0f
                 p.pause()
@@ -388,7 +418,11 @@ class VideoPagerAdapter(
         playerHolder[player] = holder
         // continuă de unde ai rămas? restaurez poziția salvată, dar NU pornesc automat
         try {
-            val istoric = memoryManager.getIstoric(videoName)
+            val mediaId = idPentru(position)
+            if (names.count { it == videoName } == 1) {
+                memoryManager.migreazaIstoricLegacy(mediaId, videoName)
+            }
+            val istoric = memoryManager.getIstoric(mediaId)
             if (istoric.isNotEmpty()) {
                 val durataMs = player.duration
                 val poz = (istoric.last()["pozitie"] as? Int ?: 0) * 1000L
@@ -563,10 +597,10 @@ class VideoPagerAdapter(
                             showVerticalIndicator(h, 1, currentVolume)
                             true
                         }
-                        3 -> { // SEEK: dx / w * 120 secunde (preview fluid la MOVE; seek REAL doar la UP)
+                        3 -> { // SEEK: dx / w * pasul configurat (preview fluid; seek real doar la UP)
                             val durata = player.duration.coerceAtLeast(0L)
                             if (durata > 0) {
-                                val deltaMs = (dx / w87 * 120_000f).toLong()
+                                val deltaMs = seekDeltaMs(dx, w87, seekStepSec)
                                 val target = (h.dragStartPosMs + deltaMs).coerceIn(0L, durata)
                                 h.seekTargetMs = target // rețin ținta; NU seek aici (rebuffer lent la fiecare move)
                                 h.seekActive = true
@@ -611,11 +645,15 @@ class VideoPagerAdapter(
             }
         }
 
-        val esteFav = memoryManager.esteFavorit(videoName)
+        val mediaId = idPentru(position)
+        if (names.count { it == videoName } == 1) {
+            memoryManager.migreazaFavoritLegacy(mediaId, videoName)
+        }
+        val esteFav = memoryManager.esteFavorit(mediaId)
         setFavoriteVisual(esteFav)
         holder.btnFav.setOnClickListener {
             val durataSecunde = (player.duration / 1000L).coerceAtLeast(0L).toInt()
-            val ac = memoryManager.toggleFavorite(videoName, durataSecunde)
+            val ac = memoryManager.toggleFavorite(mediaId, videoName, durataSecunde)
             setFavoriteVisual(ac)
         }
 
@@ -658,6 +696,9 @@ class VideoPagerAdapter(
      * oprește toate celelalte. Apelat când se schimbă pagina în ViewPager2.
      */
     fun setActivePage(position: Int) {
+        if (activePosition != position) {
+            live[activePosition]?.let { salveazaProgres(numePentru(it), it, null) }
+        }
         activePosition = position
         val player = live[position]
         if (player != null) playerActiv = player
@@ -686,6 +727,7 @@ class VideoPagerAdapter(
             val pozitieMs = player.currentPosition
             val progres = progresForced ?: ((pozitieMs * 100) / durataMs).toInt()
             memoryManager.salveazaInIstoric(
+                id = items.getOrNull(pozitiePentru(player))?.let { uri -> mediaId(uri) } ?: "",
                 nume = nume,
                 progres = progres,
                 pozitieSecunde = (pozitieMs / 1000).toInt(),

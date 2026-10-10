@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private val onPhotoPageSelected = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             thumbAdapter?.let { ta ->
-                photoThumbStrip.post { ta.notifyDataSetChanged() }
+                photoThumbStrip.post { ta.setCurrentIndex(position) }
                 photoThumbStrip.scrollToPosition(position)
             }
             actualizeazaButonFavorit(position)
@@ -470,6 +470,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Toast.makeText(this, "Nu s-a selectat nicio poză", Toast.LENGTH_SHORT).show()
             return
         }
+        imagePager.adapter = null
+        photoAdapter?.shutdown()
         val nouAdapter = ImagePagerAdapter(this, lista)
         photoAdapter = nouAdapter
         imagePager.adapter = nouAdapter
@@ -706,13 +708,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Toast.makeText(this, "Nu s-a selectat niciun video", Toast.LENGTH_SHORT).show()
             return
         }
+        viewPager.adapter = null
+        adapter?.elibereazaTot()
         // ecranul rămâne treaz cât timp există videoclipuri de redat
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val nouAdapter = VideoPagerAdapter(
             context = this,
             items = lista,
             initialVolume = volumCurent,
-            onBrightnessChange = { aplicaLumina(it) },
+            onBrightnessChange = { sincronizeazaLuminozitateDinSwipe(it) },
             // Swipe-ul pe dreapta schimbă deja volumul sistemului în adapter;
             // aici sincronizăm starea aplicației, sliderul și persistența.
             onVolumeChange = { sincronizeazaVolumDinSwipe(it) }
@@ -765,6 +769,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         volumCurent = valoare.coerceIn(0f, 1f)
         if (::photoVolumeSeek.isInitialized) {
             photoVolumeSeek.progress = (volumCurent * 1000).toInt()
+        }
+        salveazaSetarileCurente()
+    }
+
+    private fun sincronizeazaLuminozitateDinSwipe(valoare: Float) {
+        luminozitateCurenta = valoare.coerceIn(0.15f, 1f)
+        aplicaLumina(luminozitateCurenta)
+        if (::photoBrightnessSeek.isInitialized) {
+            photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         }
         salveazaSetarileCurente()
     }
@@ -1082,10 +1095,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                     .apply()
                 favoritesPoze.clear()
                 // 3. curăță și memoria + pager-urile
-                videouri.clear()
-                poze.clear()
                 viewPager.adapter = null
                 imagePager.adapter = null
+                adapter?.elibereazaTot()
+                photoAdapter?.shutdown()
+                videouri.clear()
+                poze.clear()
                 adapter = null
                 photoAdapter = null
                 actualizeazaMiniaturi()
