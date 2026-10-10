@@ -312,10 +312,7 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         return ScrollView(requireContext()).apply {
             isFillViewport = true
             setBackgroundResource(R.drawable.bg_settings_sheet)
-            addView(root, ScrollView.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ))
+            addView(root)
         }
     }
 
