@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
 class ThumbnailAdapter(
     private val context: Context,
     private val items: List<Uri>,
-    private val currentIndex: Int,
+    private var currentIndex: Int,
     private val onClick: (position: Int) -> Unit
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ThumbnailAdapter.ThVH>() {
 
@@ -44,6 +44,15 @@ class ThumbnailAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
+    fun setCurrentIndex(index: Int) {
+        val next = index.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        val previous = currentIndex
+        if (previous == next) return
+        currentIndex = next
+        if (previous in items.indices) notifyItemChanged(previous)
+        if (next in items.indices) notifyItemChanged(next)
+    }
 
     override fun onBindViewHolder(holder: ThVH, position: Int) {
         val uri = items[position]

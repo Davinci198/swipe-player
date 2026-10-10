@@ -23,6 +23,17 @@ on:
       - 'gradle/**'
       - 'gradle.properties'
       - 'gradlew'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'app/**'
+      - 'dragonbones/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
 concurrency:
   group: build-full-${{ github.ref }}
   cancel-in-progress: true
@@ -117,6 +128,16 @@ jobs:
           ./gradlew ${{ steps.gradle-task.outputs.task }} --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError' -Dkotlin.daemon.jvmargs='-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200' 2>&1 | tee gradle.log
           echo '=== BUILD COMPLETED SUCCESSFULLY ==='
           grep -i 'BUILD SUCCESSFUL' gradle.log || echo 'Build may have completed with warnings'
+
+      - name: Run JVM tests
+        shell: bash
+        env:
+          _JAVA_OPTIONS: '-Xmx4g'
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testOriginalDebugUnitTest --no-daemon --max-workers=1 \
+            -Dorg.gradle.jvmargs='-Xmx4g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200' \
+            -Dkotlin.daemon.jvmargs='-Xmx3g -Xms1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200'
 
       - name: Upload gradle log on failure
         if: failure()

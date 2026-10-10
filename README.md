@@ -43,10 +43,10 @@ SwipePlayer/
 
 ## GitHub Actions
 
-La push pe `main` sau manual din **Actions** tab, workflow-ul:
+La push/PR către `main` sau manual din **Actions** tab, workflow-ul `Full APK Build`:
 1. Instalează Android SDK + NDK 27 + CMake
 2. Compilează DragonBones C++ cu NDK 27 fix
-3. Rulează `assembleCloneDebug`
+3. Rulează `assembleOriginalDebug` implicit; varianta clone este disponibilă manual
 4. Returnează APK-ul ca artifact
 
 ## NDK 27 Fix

@@ -94,4 +94,5 @@ dependencies {
     implementation("com.google.android.material:material:1.9.0")
     // DragonBones prebuilt AAR (v1.1.0) - classes com.dragonbones.* + libdragonbones_native.so (4 ABIs)
     implementation(files("libs/dragonbones-release.aar"))
+    testImplementation("junit:junit:4.13.2")
 }

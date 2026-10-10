@@ -33,10 +33,9 @@ class PlaybackService : Service() {
         private const val CHANNEL_ID = "playback_channel"
         private const val NOTIF_ID = 2001
 
-        const val ACTION_CONTROL = "com.swipe.player.ACTION_PLAYBACK_CONTROL"
-        const val ACTION_PLAY = "com.swipe.player.PLAY"
-        const val ACTION_PAUSE = "com.swipe.player.PAUSE"
-        const val ACTION_STOP = "com.swipe.player.STOP"
+        const val ACTION_PLAY = PlaybackControl.ACTION_PLAY
+        const val ACTION_PAUSE = PlaybackControl.ACTION_PAUSE
+        const val ACTION_STOP = PlaybackControl.ACTION_STOP
 
         /** Numele videoclipului aflat în redare (afișat în notificare. */
         private var currentName: String = "Swipe Player"
@@ -62,15 +61,10 @@ class PlaybackService : Service() {
     // Receiver pentru acțiunile din notificare (forwardă spre MainActivity prin broadcast).
     private val controlReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, intent: Intent) {
-            val action = intent.action
-            val forward = Intent(ACTION_CONTROL).setPackage(c.packageName)
-            when (action) {
-                ACTION_PLAY -> forward.action = ACTION_PLAY
-                ACTION_PAUSE -> forward.action = ACTION_PAUSE
-                ACTION_STOP -> forward.action = ACTION_STOP
-            }
-            c.sendBroadcast(forward)
-            if (action == ACTION_STOP) {
+            val forwardAction = PlaybackControl.commandForNotificationAction(intent.action)
+                ?: return
+            c.sendBroadcast(Intent(forwardAction).setPackage(c.packageName))
+            if (forwardAction == ACTION_STOP) {
                 stopSelf()
             }
         }
@@ -80,9 +74,9 @@ class PlaybackService : Service() {
         super.onCreate()
         createChannel()
         val filter = IntentFilter().apply {
-            addAction(ACTION_PLAY)
-            addAction(ACTION_PAUSE)
-            addAction(ACTION_STOP)
+            addAction(PlaybackControl.NOTIFICATION_PLAY)
+            addAction(PlaybackControl.NOTIFICATION_PAUSE)
+            addAction(PlaybackControl.NOTIFICATION_STOP)
         }
         // FIX crash pe Android 13+ (API 33): registerReceiver FĂRĂ flag RECEIVER_EXPORTED /
         // RECEIVER_NOT_EXPORTED aruncă SecurityException la fiecare pornire a serviciului
@@ -172,9 +166,9 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val playPending = pendingFor(ACTION_PLAY)
-        val pausePending = pendingFor(ACTION_PAUSE)
-        val stopPending = pendingFor(ACTION_STOP)
+        val playPending = pendingFor(PlaybackControl.NOTIFICATION_PLAY)
+        val pausePending = pendingFor(PlaybackControl.NOTIFICATION_PAUSE)
+        val stopPending = pendingFor(PlaybackControl.NOTIFICATION_STOP)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Redare în fundal")
