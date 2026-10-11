@@ -13,7 +13,10 @@
         android:id="@+id/player_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:use_controller="false"
+        app:use_controller="true"
+        app:auto_show="false"
+        app:hide_on_touch="false"
+        app:show_timeout="2500"
         android:clickable="false"
         android:focusable="false"
         app:resize_mode="fit" />
@@ -228,7 +231,8 @@
     <!-- ============================================================
          GESTURE INTERCEPT + OVERLAY-URI NEON (design #08080A / #FF2A3D)
          touchIntercept: strat transparent DUPĂ playerView (vizual), clickable+focusable
-         ca să primească touch-ul peste PlayerView (care are use_controller=false).
+         ca să primească touch-ul peste PlayerView. Controllerul (use_controller=true)
+         e afișat/ascuns doar din cod (tap simplu); PlayerView nu primește touch direct.
          Cele 2 overlay-uri sunt 48dp x 180dp, centrate vertical pe stânga/dreapta,
          cu ProgressBar orizontal rotit -90 (=> afișat vertical) și iconiță jos.
          ============================================================ -->

@@ -24,6 +24,7 @@ void OpenGLSlot::_onClear()
     vertices.clear();
     indices.clear();
     textureID = 0;
+    isSkinned = false;
 }
 
 void OpenGLSlot::_initDisplay(void* value, bool isRetain) {}
@@ -71,6 +72,9 @@ void OpenGLSlot::_updateColor() {}
 // 新增方法的实现
 void OpenGLSlot::_updateFrame()
 {
+    // Plain image quads are never skinned; reset in case this slot previously showed a skinned mesh.
+    isSkinned = false;
+
     const auto* textureData = static_cast<const opengl::OpenGLTextureData*>(_textureData);
     if (!textureData) {
         vertices.clear();

@@ -15,7 +15,7 @@ class OpenGLSlot : public Slot
 public:
     std::vector<float> vertices;
     std::vector<unsigned short> indices;
-    unsigned int textureID;
+    unsigned int textureID = 0;
     bool isSkinned = false;
 
 protected:

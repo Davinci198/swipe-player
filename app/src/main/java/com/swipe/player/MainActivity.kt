@@ -10,7 +10,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.app.PictureInPictureParams
@@ -19,9 +18,10 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.viewpager2.widget.ViewPager2
 
 /**
@@ -35,7 +35,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private val TAG = "MainActivity"
     private val REQUEST_VIDEOS = 1001
     private val REQUEST_PHOTOS = 1003
-    private val REQUEST_PERMS = 1002
     private val FILE_MANAGER_PACKAGE = "com.alphainventor.filemanager"
     private val FILE_MANAGER_PICKER = "$FILE_MANAGER_PACKAGE.activity.PickerActivity"
     private val PREFS = "swipe_uv"
@@ -76,34 +75,24 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var ctrlPhotoVizibil: Boolean = true  // poze: lumină/volum + butoanele
     private var playlistVizibil: Boolean = true   // liste de redare (miniaturi)
 
-    // Marchează că playerul rulează în momentul în care începe un apel telefonic,
-    // ca să-l reluăm automat după încheierea apelului.
-    private var eraRedareLaApel = false
+    // Pauza la apel telefonic e gestionată prin audio focus (ExoPlayer, în VideoPagerAdapter),
+    // fără READ_PHONE_STATE.
 
-    // Pauză automată la apel telefonic (RINGING/OFFHOOK) + reluare la IDLE.
-    private val phoneStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(c: Context, intent: Intent) {
-            try {
-                val state = intent.getStringExtra(android.telephony.TelephonyManager.EXTRA_STATE)
-                when (state) {
-                    android.telephony.TelephonyManager.EXTRA_STATE_RINGING,
-                    android.telephony.TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                        if (modCurent == "video") {
-                            eraRedareLaApel =
-                                adapter?.isAnyPlayerPlaying() ?: false
-                            adapter?.pauseAllPlayers()
-                        }
-                    }
-                    android.telephony.TelephonyManager.EXTRA_STATE_IDLE -> {
-                        if (eraRedareLaApel && modCurent == "video") {
-                            eraRedareLaApel = false
-                            adapter?.resumeActivePlayer()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Eroare receptor stare telefon", e)
-            }
+    // true dacă playerul activ rula când activitatea a intrat în onPause
+    // => în onResume reluăm redarea DOAR în acest caz.
+    private var redaLaPauza = false
+
+    // Cerere permisiune notificări (API 33+) pentru notificarea de redare în fundal.
+    // Nu blocăm activarea opțiunii dacă utilizatorul refuză.
+    private val cerereNotificari = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { acordat ->
+        if (!acordat) {
+            Toast.makeText(
+                this,
+                "Fără permisiunea de notificări, controalele redării în fundal nu vor fi afișate",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -168,19 +157,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             addAction(PlaybackService.ACTION_PAUSE)
             addAction(PlaybackService.ACTION_STOP)
         }
-        registerReceiver(playbackControlReceiver, ff, ContextCompat.RECEIVER_NOT_EXPORTED)
-
-        // Pauză automată la apel telefonic (cu permisiunile READ_PHONE_STATE opționale)
-        try {
-            val ffPhone = IntentFilter(android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(phoneStateReceiver, ffPhone, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(phoneStateReceiver, ffPhone)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Nu pot înregistra receiver-ul de stare telefonică", e)
-        }
+        // ContextCompat => NOT_EXPORTED respectat și pe API 26-32 (nu doar pe 33+)
+        ContextCompat.registerReceiver(
+            this, playbackControlReceiver, ff, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         tvStatus = findViewById(R.id.tvStatus)
         viewPager = findViewById(R.id.viewPager)
@@ -279,8 +258,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         photoVolumeSeek.progress = (volumCurent * 1000).toInt()
 
-        cerePermisiuniDacaNecesar()
-        cerePermisiuneLuminozitate() // Motorola/Android 12+: WRITE_SETTINGS pentru swipe lumina
+        // Fără cereri de permisiuni la pornire: media se citește doar prin SAF (URI-uri
+        // persistate), iar luminozitatea se aplică pe fereastră (nu necesită WRITE_SETTINGS).
 
         // Restaurează listele salvate (videoclipuri + poze)
         restaurareLista()
@@ -336,40 +315,35 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     /**
-     * Luminozitatea ecranului (window.attributes.screenBrightness) e ignorată pe
-     * Android 12+ / Motorola dacă app nu are WRITE_SETTINGS. Aici cerem accesul.
+     * Android 13+ (API 33): notificarea serviciului de redare în fundal necesită
+     * POST_NOTIFICATIONS la runtime. O cerem când utilizatorul activează „Redare în fundal”.
      */
-    private fun cerePermisiuneLuminozitate() {
+    private fun cerePermisiuneNotificariDacaNecesar() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                !Settings.System.canWrite(this)) {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                    Uri.parse("package:$packageName")
-                )
-                Toast.makeText(
-                    this,
-                    "Permiteți modificarea luminozității pentru controlul swipe",
-                    Toast.LENGTH_LONG
-                ).show()
-                try {
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Nu pot deschide setările WRITE_SETTINGS", e)
-                }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                cerereNotificari.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Eroare verificare WRITE_SETTINGS", e)
+            Log.w(TAG, "Nu pot cere permisiunea de notificări", e)
         }
     }
 
-    private fun cerePermisiuniDacaNecesar() {
-        if (Build.VERSION.SDK_INT >= 33) return
-        if (Build.VERSION.SDK_INT >= 23 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_PERMS)
+    /** Eliberează accesul persistent SAF pentru un URI care nu mai e folosit în aplicație. */
+    private fun elibereazaAccesUri(uri: Uri) {
+        try {
+            val flags = contentResolver.persistedUriPermissions
+                .firstOrNull { it.uri == uri }
+                ?.let { p ->
+                    var f = 0
+                    if (p.isReadPermission) f = f or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    if (p.isWritePermission) f = f or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    f
+                } ?: return
+            if (flags != 0) contentResolver.releasePersistableUriPermission(uri, flags)
+        } catch (e: Exception) {
+            Log.w(TAG, "Nu pot elibera accesul pentru $uri", e)
         }
     }
 
@@ -415,24 +389,49 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             data.data?.let { uriSele.add(it) }
         }
         if (uriSele.isEmpty()) return
+        // Persistăm DOAR flag-urile acordate efectiv de picker (READ, + WRITE dacă există,
+        // necesar pentru redenumire). Altfel takePersistableUriPermission aruncă excepție.
+        val scrisAcordat = (data.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0
+        val flagPersist = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+            (if (scrisAcordat) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
+        var temporare = 0
         uriSele.forEach { uri ->
             try {
-                contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (e: Exception) { Log.w(TAG, "nu pot persista accesul: $e") }
+                contentResolver.takePersistableUriPermission(uri, flagPersist)
+            } catch (e: Exception) {
+                // reîncercăm doar cu READ (unii furnizori nu acordă WRITE persistabil)
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e2: Exception) {
+                    // pickerele terțe (ex. File Manager) dau adesea doar acces temporar:
+                    // fișierul se poate reda acum, dar accesul nu supraviețuiește repornirii
+                    Log.w(TAG, "nu pot persista accesul: $e2")
+                    temporare++
+                }
+            }
         }
+        val uriAcces = uriSele
+        if (temporare > 0) {
+            Toast.makeText(
+                this,
+                "$temporare fișier(e) au doar acces temporar și pot dispărea după repornire",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        if (uriAcces.isEmpty()) return
         // ADUNA selecția la lista existentă (nu o înlocuiește!), ca să nu dispară
         // pozele/videoclipurile adăugate anterior. Eliminăm duplicatele, păstrând ordinea.
         if (requestCode == REQUEST_VIDEOS) {
             val existente = videouri.map { it.toString() }.toSet()
-            for (uri in uriSele) {
+            for (uri in uriAcces) {
                 if (uri.toString() !in existente) videouri.add(uri)
             }
             salveazaLista()
             incarcaLista(videouri)
         } else {
             val existente = poze.map { it.toString() }.toSet()
-            for (uri in uriSele) {
+            for (uri in uriAcces) {
                 if (uri.toString() !in existente) poze.add(uri)
             }
             salveazaPoze()
@@ -499,7 +498,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             setText(numeCurent)
             selectAll()
             setSingleLine(true)
-            hint = "Noul nume (fără extensie .jpg)"
+            hint = "Noul nume (fără extensie; se păstrează cea originală)"
         }
         android.app.AlertDialog.Builder(this)
             .setTitle("Redenumește poza")
@@ -508,10 +507,19 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 val noulNume = input.text.toString().trim()
                 if (noulNume.isEmpty()) return@setPositiveButton
                 val reusit = redenumestePoza(uri, noulNume)
-                if (reusit != null) {
+                // poziția poate fi invalidă dacă lista s-a schimbat cât timp dialogul era deschis
+                if (reusit != null && position < poze.size && poze[position] == uri) {
                     // actualizează lista + persistă + actualizează galeria curentă (fără a sări la prima poză)
                     poze[position] = reusit
                     salveazaPoze()
+                    // mutăm favoritul de pe vechiul URI pe cel nou
+                    val cheieVeche = uri.toString()
+                    val cheieNoua = reusit.toString()
+                    if (cheieVeche != cheieNoua && favoritesPoze.remove(cheieVeche)) {
+                        favoritesPoze.add(cheieNoua)
+                        salveazaFavoritPoze()
+                    }
+                    actualizeazaButonFavorit(position)
                     actualizeazaMiniaturi()
                     photoAdapter?.notifyItemChanged(position)
                     Toast.makeText(this, "Poza redenumită ✔", Toast.LENGTH_SHORT).show()
@@ -523,25 +531,27 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             .show()
     }
 
+    /** Numele afișat al pozei (fără extensie): DISPLAY_NAME întâi, apoi ID-ul documentului. */
     private fun numePoza(uri: Uri): String? {
+        val dinNume = queryDisplayNameComplet(uri)?.substringBeforeLast('.')
+        if (!dinNume.isNullOrBlank()) return dinNume
         return try {
-            val display = android.provider.DocumentsContract.getDocumentId(uri)
+            android.provider.DocumentsContract.getDocumentId(uri)
                 ?.substringAfterLast('/')
-            if (display.isNullOrBlank()) {
-                queryDisplayName(uri)
-            } else display
-        } catch (e: Exception) { queryDisplayName(uri) }
+                ?.substringAfterLast(':')
+                ?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) { null }
     }
 
-    private fun queryDisplayName(uri: Uri): String? {
+    /** DISPLAY_NAME complet (cu extensie) sau null. */
+    private fun queryDisplayNameComplet(uri: Uri): String? {
         return try {
             val c = contentResolver.query(uri, arrayOf(
                 android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
             c?.use {
                 if (it.moveToFirst()) {
-                    val name = it.getString(it.getColumnIndexOrThrow(
-                        android.provider.OpenableColumns.DISPLAY_NAME))
-                    name?.substringBeforeLast('.')
+                    val idx = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) it.getString(idx) else null
                 } else null
             }
         } catch (e: Exception) { null }
@@ -551,22 +561,45 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private fun redenumestePoza(uri: Uri, numeNou: String): Uri? {
         return try {
             val newUri = android.provider.DocumentsContract.renameDocument(
-                contentResolver, uri, nomFisier(numeNou))
-            if (newUri != null) {
+                contentResolver, uri, nomFisier(numeNou, uri))
+            if (newUri != null && newUri != uri) {
+                // persistăm accesul pe noul URI (READ + WRITE dacă era acordat pe cel vechi)
+                val vechi = contentResolver.persistedUriPermissions.firstOrNull { it.uri == uri }
+                val flagNou = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    (if (vechi?.isWritePermission == true) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
                 try {
-                    contentResolver.takePersistableUriPermission(
-                        newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (e: Exception) { }
+                    contentResolver.takePersistableUriPermission(newUri, flagNou)
+                } catch (e: Exception) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e2: Exception) {
+                        Log.w(TAG, "nu pot persista accesul pe URI-ul redenumit", e2)
+                        Toast.makeText(this,
+                            "Poza a fost redenumită, dar accesul poate expira la repornire",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+                // vechiul URI nu mai e valid => eliberăm grant-ul
+                elibereazaAccesUri(uri)
                 newUri
-            } else uri
+            } else newUri ?: uri
         } catch (e: Exception) {
             Log.w(TAG, "renameDocument a eșuat", e)
             null
         }
     }
 
-    private fun nomFisier(nume: String): String {
-        return if (nume.contains('.')) nume else "$nume.jpg"
+    /** Păstrează extensia originală dacă utilizatorul nu a scris una. */
+    private fun nomFisier(nume: String, uriOriginal: Uri): String {
+        if (nume.contains('.')) return nume
+        val numeOriginal = queryDisplayNameComplet(uriOriginal)
+        val ext = numeOriginal
+            ?.takeIf { it.contains('.') }
+            ?.substringAfterLast('.')
+            ?.takeIf { it.isNotBlank() }
+            ?: return nume
+        return "$nume.$ext"
     }
 
     // ===== Auto-hide controale foto (creion + bară luminozitate/volum), după 3s =====
@@ -609,9 +642,9 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (poze.isEmpty() || pos < 0 || pos >= poze.size) return
         val nume = numePoza(poze[pos]) ?: "poza"
         android.app.AlertDialog.Builder(this)
-            .setTitle("Șterge poza?")
-            .setMessage("„$nume” va fi ștearsă definitiv.")
-            .setPositiveButton("Șterge") { _, _ -> stergePoza(pos) }
+            .setTitle("Scoate poza din aplicație?")
+            .setMessage("„$nume” va fi scoasă din lista aplicației. Fișierul rămâne pe telefon.")
+            .setPositiveButton("Scoate") { _, _ -> stergePoza(pos) }
             .setNegativeButton("Anulează", null)
             .show()
     }
@@ -626,9 +659,13 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         favoritesPoze.remove(scos.toString())
         salveazaPoze()
         salveazaFavoritPoze()
+        // eliberăm accesul persistent SAF (limită de grant-uri per aplicație), doar dacă
+        // URI-ul nu mai e folosit în altă listă
+        if (videouri.none { it == scos } && poze.none { it == scos }) elibereazaAccesUri(scos)
 
         if (poze.isEmpty()) {
             imagePager.adapter = null
+            photoAdapter?.shutdown() // oprim executorul de decodare înainte de a renunța la adapter
             photoAdapter = null
             actualizeazaMiniaturi()
             setMod("video")
@@ -808,37 +845,45 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onPause() {
         super.onPause()
+        // Salvăm setările + sesiunea ÎNAINTE de orice return (inclusiv în PiP),
+        // ca să nu pierdem starea dacă procesul e omorât în fereastra mică.
+        uiHandler.removeCallbacks(salveazaSetariDebounced)
+        salveazaSetarileCurente()
+        salveazaStareSesiune() // nu pierdem poziția/modul la închidere
         // Dacă suntem în Picture-in-Picture, NU oprim redarea și NU pornim serviciul:
         // activitatea e încă vizibilă în fereastra mică, deci playerul continuă normal.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
             return
         }
+        // reținem dacă videoclipul rula, ca onResume să-l reia doar în acest caz
+        redaLaPauza = modCurent == "video" && (adapter?.isAnyPlayerPlaying() ?: false)
         // Redare în fundal: dacă e activă și suntem în mod video, lăsăm sunetul să continue
         // (nu oprim playerul + pornim un foreground service care ține procesul prioritar,
         //  ca sistemul să NU taie sunetul din cauza Doze/WakeLock).
+        // Serviciul se pornește DOAR aici (activitatea e încă vizibilă => startForegroundService
+        // e permis), nu și din onStop.
         val continuareFundal = backgroundPlayCurent && modCurent == "video"
         if (!continuareFundal) {
             adapter?.pauseAllPlayers()
         } else {
+            // redarea continuă în fundal; dacă utilizatorul o pune pe pauză din notificare,
+            // NU vrem ca onResume s-o repornească
+            redaLaPauza = false
             PlaybackService.startPlaybackService(this, numeVideoclipActiv())
         }
         // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        uiHandler.removeCallbacks(salveazaSetariDebounced)
-        salveazaSetarileCurente()
-        salveazaStareSesiune() // nu pierdem poziția/modul la închidere
     }
 
     override fun onStop() {
         super.onStop()
         // Dacă suntem în Picture-in-Picture, NU oprim/ascundem redarea — continuă în fereastra mică.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) return
-        // Redare în fundal: la Home/minimize păstrăm sunetul dacă opțiunea e activă (mod video)
+        // Redare în fundal: la Home/minimize păstrăm sunetul dacă opțiunea e activă (mod video).
+        // Serviciul a fost deja pornit din onPause (aici activitatea nu mai e vizibilă).
         val continuareFundal = backgroundPlayCurent && modCurent == "video"
         if (!continuareFundal) {
             adapter?.pauseAllPlayers() // garanție suplimentară (ex: Home button)
-        } else {
-            PlaybackService.startPlaybackService(this, numeVideoclipActiv())
         }
     }
 
@@ -855,14 +900,17 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
         // Reia videoclipul activ DOAR dacă suntem în modul video (altfel, după ce alegi
         // poze / ieși din video, videoclipul NU trebuie să pornească singur în fundal)
-        if (modCurent == "video") adapter?.resumeActivePlayer()
+        // + doar dacă rula înainte de onPause (nu repornim un videoclip pus pe pauză de utilizator).
+        if (modCurent == "video" && redaLaPauza) adapter?.resumeActivePlayer()
+        redaLaPauza = false
         // La revenirea în prim-plan nu mai avem nevoie de foreground service-ul de fundal.
         PlaybackService.stopPlaybackService(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        uiHandler.removeCallbacks(salveazaSetariDebounced)
+        // anulăm TOATE runnable-urile programate (salvare debounced, ascundere controale foto)
+        uiHandler.removeCallbacksAndMessages(null)
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
         // altfel rămâne un service orfan + notificare după închiderea aplicației
@@ -875,7 +923,6 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         photoAdapter = null
         (dragonBonesBridge as? com.swipe.player.DragonBonesBridge)?.release()
         try { unregisterReceiver(playbackControlReceiver) } catch (e: Exception) {}
-        try { unregisterReceiver(phoneStateReceiver) } catch (e: Exception) {}
         // restaurează luminozitatea sistemului (să nu rămână blocată pe valoarea setată)
         try {
             val lp = window.attributes ?: return
@@ -954,6 +1001,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 photoFavBtn.visibility = if (ctrlPhotoVizibil) View.VISIBLE else View.GONE
                 photoThumbStrip.visibility = if (playlistVizibil) View.VISIBLE else View.GONE
                 if (ctrlPhotoVizibil) afiseazaControaleFoto()
+            }
+            // PiP închis cu X (activitatea nu revine în prim-plan): oprim sunetul,
+            // altfel videoclipul ar continua să se audă fără fereastră.
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                adapter?.pauseAllPlayers()
+                PlaybackService.stopPlaybackService(this)
             }
         }
     }
@@ -1046,10 +1099,16 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     }
 
     override fun onBackgroundPlayChange(activat: Boolean) {
+        val eraActivat = backgroundPlayCurent
         backgroundPlayCurent = activat
         salveazaSetarileCurente()
-        // dacă dezactivăm din mers și sună ceva în fundal, îl oprim imediat
-        if (!activat) adapter?.pauseAllPlayers()
+        if (activat) {
+            // Android 13+: fără POST_NOTIFICATIONS notificarea de control nu apare
+            if (!eraActivat) cerePermisiuneNotificariDacaNecesar()
+        } else {
+            // dezactivat: oprim doar serviciul de fundal; videoclipul din prim-plan continuă
+            PlaybackService.stopPlaybackService(this)
+        }
     }
 
     override fun onAutoOrderChange(activat: Boolean) {
@@ -1098,6 +1157,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 "Fișierele rămân pe telefon."
             )
             .setPositiveButton("Șterge") { _, _ ->
+                // 0. eliberăm accesul persistent SAF pentru toate fișierele scoase din aplicație
+                (videouri + poze).distinct().forEach { elibereazaAccesUri(it) }
                 // 1. istoric vizionare (progress)
                 MemoryManager.getInstance(this).stergeTotIstoricul()
                 // 2. listele salvate din preferințe
@@ -1121,8 +1182,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
                 actualizeazaMiniaturi()
                 viewPager.setCurrentItem(0, false)
                 imagePager.setCurrentItem(0, false)
+                // fără videoclipuri nu mai ținem ecranul treaz forțat
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                PlaybackService.stopPlaybackService(this)
                 tvStatus.text = "Bibliotecă golită. Alege fișiere din Setări"
                 setMod("video")
+                arataButonPipDacaAreLoc() // ascunde butonul PiP (nu mai există conținut)
                 Toast.makeText(this, "Bibliotecă + istoric șterse", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Anulează", null)
@@ -1144,10 +1209,15 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         seekStepCurent = 10
         aplicaLumina(1f)
         adapter?.setBrightness(1f)
-        adapter?.setVolume(1f)
+        // NU folosim adapter.setVolume(1f): ar seta volumul media AL SISTEMULUI la maxim.
+        // Actualizăm doar câștigul intern al playerului (aplicat la următoarea reluare).
+        adapter?.currentVolume = 1f
+        if (::photoBrightnessSeek.isInitialized) photoBrightnessSeek.progress = 1000
+        if (::photoVolumeSeek.isInitialized) photoVolumeSeek.progress = 1000
         adapter?.seekStepSec = seekStepCurent
         val (w, h) = rezolutieW(0)
         adapter?.setResolutie(w, h)
+        if (backgroundPlayCurent) PlaybackService.stopPlaybackService(this)
         backgroundPlayCurent = false
         autoOrderCurent = true
         adapter?.autoOrder = autoOrderCurent

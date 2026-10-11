@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 /**
  * 🎧 PlaybackService — foreground service de redare în fundal.
@@ -91,12 +92,9 @@ class PlaybackService : Service() {
             // dacă serviciul e repornit (sistemul îl ține orfan), receiver-ul poate fi deja
             // înregistrat => unregister întâi pt a evita IllegalArgumentException la re-register
             try { unregisterReceiver(controlReceiver) } catch (e: Exception) { /* nu era */ }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(controlReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("DEPRECATION")
-                registerReceiver(controlReceiver, filter)
-            }
+            // ContextCompat aplică NOT_EXPORTED și pe API 26-32 (altfel receiver-ul ar fi exportat)
+            ContextCompat.registerReceiver(
+                this, controlReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         } catch (e: Exception) {
             // niciodată să nu lăsăm serviciul să crape din cauza receiver-ului
             Log.e("PlaybackService", "Nu pot înregistra controlReceiver: $e")
@@ -138,6 +136,9 @@ class PlaybackService : Service() {
                 startForeground(NOTIF_ID, buildNotification())
             } catch (e2: Exception) {
                 Log.e("PlaybackService", "Nu pot porni foreground: $e2")
+                // Serviciul pornit cu startForegroundService TREBUIE să intre în foreground,
+                // altfel sistemul aruncă ForegroundServiceDidNotStartInTimeException => ne oprim.
+                stopSelf()
             }
         }
     }

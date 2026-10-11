@@ -72,10 +72,12 @@ jobs:
 
       - name: Install NDK and CMake
         run: |
+          unset _JAVA_OPTIONS
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
-          sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-          echo "NDK_ROOT=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          yes | sdkmanager --install 'ndk;27.0.12077973' 'cmake;3.22.1' --sdk_root=$ANDROID_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "NDK_ROOT=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
 
       - name: Set up swap
         uses: pierotofy/set-swap-space@master
@@ -124,17 +126,26 @@ jobs:
           grep -i "BUILD SUCCESSFUL" gradle.log || echo "Build finished"
 
       - name: Sign APK
+        id: sign
         if: success()
+        shell: bash
+        env:
+          # Secrets go through env, never interpolated into the script text.
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
+          set -euo pipefail
           echo "=== Signing APK ==="
           # Decode keystore from secrets
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
 
           # Find the unsigned APK
-          UNSIGNED_APK=$(find app/build/outputs/apk -name "*-unsigned.apk" | head -1)
+          UNSIGNED_APK=$(find app/build/outputs/apk -name "*-unsigned.apk" | head -1 || true)
           if [ -z "$UNSIGNED_APK" ]; then
             echo "No unsigned APK found, trying all APKs..."
-            UNSIGNED_APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+            UNSIGNED_APK=$(find app/build/outputs/apk -name "*.apk" | head -1 || true)
           fi
 
           if [ -z "$UNSIGNED_APK" ]; then
@@ -148,14 +159,14 @@ jobs:
 
           # Determine output name
           BASENAME=$(basename "$UNSIGNED_APK")
-          SIGNED_APK="app/build/outputs/apk/$(echo $BASENAME | sed 's/-unsigned//g')"
+          SIGNED_APK="app/build/outputs/apk/$(echo "$BASENAME" | sed 's/-unsigned//g; s/\.apk$/-signed.apk/')"
 
           # Use apksigner to sign
           ${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -1)/apksigner sign \
             --ks /tmp/release.keystore \
-            --ks-key-alias ${{ secrets.RELEASE_KEY_ALIAS }} \
-            --ks-pass pass:${{ secrets.RELEASE_STORE_PASSWORD }} \
-            --key-pass pass:${{ secrets.RELEASE_KEY_PASSWORD }} \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KS_PASS \
+            --key-pass env:KEY_PASS \
             --out "$SIGNED_APK" \
             "$UNSIGNED_APK"
 
@@ -163,6 +174,8 @@ jobs:
           ${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -1)/apksigner verify "$SIGNED_APK"
           echo "✅ APK signed successfully!"
           ls -lh "$SIGNED_APK"
+          rm -f /tmp/release.keystore
+          echo "signed_apk=$SIGNED_APK" >> "$GITHUB_OUTPUT"
 
       - name: Show all APK files
         if: always()
@@ -175,8 +188,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: swipe-player-release-${{ github.run_number }}
-          path: |
-            **/*.apk
+          path: ${{ steps.sign.outputs.signed_apk }}
           if-no-files-found: warn
           retention-days: 30
 
@@ -184,6 +196,6 @@ jobs:
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: "**/*.apk"
+          files: ${{ steps.sign.outputs.signed_apk }}
           generate_release_notes: true
           draft: false

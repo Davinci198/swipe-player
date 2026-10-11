@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <mutex>
+#include <time.h>
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 
@@ -43,6 +45,9 @@ namespace {
         bool isDataLoaded = false;
         bool isGlReady = false;
 
+        // Frame timing (CLOCK_MONOTONIC, seconds). < 0 means "no previous frame".
+        double lastFrameTime = -1.0;
+
         ~JniBridgeInstance() {
             if (dragonBones) {
                 delete dragonBones;
@@ -62,6 +67,13 @@ namespace {
 
     JniBridgeInstance* instance = nullptr;
 
+    // Guards creation/destruction of `instance` and all access to it from JNI entry
+    // points (init runs on the UI thread, everything else on the GL thread).
+    // Rule: every JNI entry point takes this lock exactly once; helpers called from
+    // entry points (getInstance, _tryBuildArmature, ...) must NOT lock it (non-recursive).
+    std::mutex instanceMutex;
+
+    // Caller must hold instanceMutex.
     JniBridgeInstance* getInstance() {
         if (!instance) {
             instance = new JniBridgeInstance();
@@ -212,8 +224,19 @@ namespace {
         memcpy(result, res, sizeof(res));
     }
 
+    double monotonicSeconds() {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+    }
+
+    // Caller must hold instanceMutex.
     void _tryBuildArmature(JniBridgeInstance* instance) {
-        if (!instance->isGlReady || !instance->isDataLoaded || instance->armature) {
+        if (!instance || !instance->isGlReady || !instance->isDataLoaded || instance->armature) {
+            return;
+        }
+        if (!instance->factory || !instance->dragonBones) {
+            LOGE("_tryBuildArmature: factory/dragonBones not initialized (init() not called?)");
             return;
         }
 
@@ -279,6 +302,7 @@ static float viewportHeight = 0.0f;
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_init(JNIEnv *env, jclass clazz) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance->factory) {
         instance->factory = new dragonBones::opengl::OpenGLFactory();
@@ -292,6 +316,7 @@ Java_com_dragonbones_JniBridge_init(JNIEnv *env, jclass clazz) {
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_loadDragonBones(JNIEnv *env, jclass clazz, jbyteArray skeleton_data, jbyteArray texture_json_data, jbyteArray texture_png_data) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance) return;
 
@@ -305,7 +330,9 @@ Java_com_dragonbones_JniBridge_loadDragonBones(JNIEnv *env, jclass clazz, jbyteA
         // 2. Clear all parsed data (dragonbones data, texture atlas data) from the factory.
         // Recreating the factory is dangerous because the DragonBones instance holds a pointer
         // to it as an event manager. Clearing is the intended way to switch models.
-        instance->factory->clear();
+        if (instance->factory) {
+            instance->factory->clear();
+        }
     }
     instance->isDataLoaded = false;
     instance->dragonBonesDataBuffer.clear();
@@ -347,8 +374,9 @@ Java_com_dragonbones_JniBridge_loadDragonBones(JNIEnv *env, jclass clazz, jbyteA
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onPause(JNIEnv *env, jclass clazz) {
     LOGI("DragonBones onPause");
+    std::lock_guard<std::mutex> lock(instanceMutex);
     // 暂停动画和渲染
-    if (getInstance()->dragonBones) {
+    if (instance && instance->dragonBones) {
         // 可以在这里保存状态或暂停动画
     }
 }
@@ -356,8 +384,13 @@ Java_com_dragonbones_JniBridge_onPause(JNIEnv *env, jclass clazz) {
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onResume(JNIEnv *env, jclass clazz) {
     LOGI("DragonBones onResume");
+    std::lock_guard<std::mutex> lock(instanceMutex);
     // 恢复动画和渲染
-    if (getInstance()->dragonBones) {
+    if (instance) {
+        // Avoid a huge dt on the first frame after resume.
+        instance->lastFrameTime = -1.0;
+    }
+    if (instance && instance->dragonBones) {
         // 可以在这里恢复之前的状态
     }
 }
@@ -365,9 +398,10 @@ Java_com_dragonbones_JniBridge_onResume(JNIEnv *env, jclass clazz) {
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onDestroy(JNIEnv *env, jclass clazz) {
     LOGI("DragonBones onDestroy");
-    auto* currentInstance = getInstance();
-    if (currentInstance) {
-        delete currentInstance;
+    std::lock_guard<std::mutex> lock(instanceMutex);
+    // Use the global directly: getInstance() would create a fresh instance just to delete it.
+    if (instance) {
+        delete instance;
         instance = nullptr;
     }
 }
@@ -375,15 +409,22 @@ Java_com_dragonbones_JniBridge_onDestroy(JNIEnv *env, jclass clazz) {
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onSurfaceCreated(JNIEnv *env, jclass clazz) {
     LOGI("DragonBones onSurfaceCreated");
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance) return;
 
     // If the surface is recreated, old GL resources are invalid. Clean up the armature.
     if (instance->armature) {
         LOGI("GL context recreated. Cleaning up old armature to recreate GL resources.");
-        instance->dragonBones->getClock()->remove(instance->armature);
+        if (instance->dragonBones) {
+            instance->dragonBones->getClock()->remove(instance->armature);
+        }
+        // Return the armature (and its slots) to the pool on the next advanceTime();
+        // previously it was only nulled, leaking it.
+        instance->armature->dispose();
         instance->armature = nullptr;
     }
+    instance->lastFrameTime = -1.0;
 
     // 1. Setup GL State
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -418,6 +459,7 @@ Java_com_dragonbones_JniBridge_onSurfaceCreated(JNIEnv *env, jclass clazz) {
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onSurfaceChanged(JNIEnv *env, jclass clazz, jint width, jint height) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (instance) {
         glViewport(0, 0, width, height);
@@ -430,14 +472,26 @@ Java_com_dragonbones_JniBridge_onSurfaceChanged(JNIEnv *env, jclass clazz, jint 
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_onDrawFrame(JNIEnv *env, jclass clazz) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
+
+    // Always clear, even when no armature is loaded yet (otherwise the surface shows garbage).
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     if (instance && instance->dragonBones)
     {
-        instance->dragonBones->advanceTime(1.0f / 60.0f);
+        // Advance by the real elapsed time (first frame after create/resume: 0).
+        const double now = monotonicSeconds();
+        float dt = 0.0f;
+        if (instance->lastFrameTime >= 0.0) {
+            dt = (float)(now - instance->lastFrameTime);
+            if (dt < 0.0f) dt = 0.0f;
+            if (dt > 0.1f) dt = 0.1f;
+        }
+        instance->lastFrameTime = now;
+        instance->dragonBones->advanceTime(dt);
 
         if (instance->armature) {
-            // 1. Clear the screen
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // 2. Setup the rendering program and global GL state
             glUseProgram(instance->programId);
@@ -528,6 +582,7 @@ Java_com_dragonbones_JniBridge_onDrawFrame(JNIEnv *env, jclass clazz) {
 
 JNIEXPORT jobjectArray JNICALL
 Java_com_dragonbones_JniBridge_getAnimationNames(JNIEnv *env, jclass clazz) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature) {
         return nullptr;
@@ -552,6 +607,7 @@ Java_com_dragonbones_JniBridge_getAnimationNames(JNIEnv *env, jclass clazz) {
 
 JNIEXPORT jfloat JNICALL
 Java_com_dragonbones_JniBridge_getAnimationDuration(JNIEnv *env, jclass clazz, jstring animation_name) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature || !animation_name) {
         return 0.0f;
@@ -572,6 +628,7 @@ Java_com_dragonbones_JniBridge_getAnimationDuration(JNIEnv *env, jclass clazz, j
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_fadeInAnimation(JNIEnv *env, jclass clazz, jstring animation_name, jint layer, jint loop, jfloat fade_in_time) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature) {
         return;
@@ -597,6 +654,7 @@ Java_com_dragonbones_JniBridge_fadeInAnimation(JNIEnv *env, jclass clazz, jstrin
 
 JNIEXPORT jstring JNICALL
 Java_com_dragonbones_JniBridge_containsPoint(JNIEnv *env, jclass clazz, jfloat x, jfloat y) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature) {
         return nullptr;
@@ -616,6 +674,7 @@ Java_com_dragonbones_JniBridge_containsPoint(JNIEnv *env, jclass clazz, jfloat x
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_setWorldScale(JNIEnv *env, jclass clazz, jfloat scale) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (instance) {
         instance->worldScale = scale;
@@ -624,6 +683,7 @@ Java_com_dragonbones_JniBridge_setWorldScale(JNIEnv *env, jclass clazz, jfloat s
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_setWorldTranslation(JNIEnv *env, jclass clazz, jfloat x, jfloat y) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (instance) {
         instance->worldTranslateX = x;
@@ -633,6 +693,7 @@ Java_com_dragonbones_JniBridge_setWorldTranslation(JNIEnv *env, jclass clazz, jf
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_overrideBonePosition(JNIEnv *env, jclass clazz, jstring bone_name, jfloat x, jfloat y) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature) return;
 
@@ -654,6 +715,7 @@ Java_com_dragonbones_JniBridge_overrideBonePosition(JNIEnv *env, jclass clazz, j
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_resetBone(JNIEnv *env, jclass clazz, jstring bone_name) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature) return;
 
@@ -669,6 +731,7 @@ Java_com_dragonbones_JniBridge_resetBone(JNIEnv *env, jclass clazz, jstring bone
 
 JNIEXPORT void JNICALL
 Java_com_dragonbones_JniBridge_stopAnimation(JNIEnv *env, jclass clazz, jstring animation_name) {
+    std::lock_guard<std::mutex> lock(instanceMutex);
     auto* instance = getInstance();
     if (!instance || !instance->armature || !instance->armature->getAnimation()) {
         return;
@@ -688,16 +751,24 @@ Java_com_dragonbones_JniBridge_stopAnimation(JNIEnv *env, jclass clazz, jstring 
 // pentru a evita UnsatisfiedLinkError la runtime.
 // ============================================================
 
+// Instance methods in DragonBonesBridge.java -> second param is jobject (thiz).
+// Must have C linkage (these are not declared in JniBridge.h), otherwise the symbols
+// are C++-mangled and the JVM cannot resolve them.
+extern "C" {
+
 JNIEXPORT jstring JNICALL
-Java_com_swipe_player_DragonBonesBridge_nativeGetVersion(JNIEnv *env, jclass /*clazz*/) {
+Java_com_swipe_player_DragonBonesBridge_nativeGetVersion(JNIEnv *env, jobject /*thiz*/) {
     LOGI("DragonBonesBridge nativeGetVersion called");
     return env->NewStringUTF("1.0.0-ndk27");
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_swipe_player_DragonBonesBridge_nativeInit(JNIEnv *env, jclass clazz) {
+Java_com_swipe_player_DragonBonesBridge_nativeInit(JNIEnv *env, jobject /*thiz*/) {
     LOGI("DragonBonesBridge nativeInit called");
-    // Delegăm la inițializarea reală a DragonBones
-    Java_com_dragonbones_JniBridge_init(env, clazz);
+    // Delegăm la inițializarea reală a DragonBones (init takes the instance lock itself;
+    // do not lock here). The jclass argument is unused by init.
+    Java_com_dragonbones_JniBridge_init(env, nullptr);
     return JNI_TRUE;
 }
+
+} // extern "C"

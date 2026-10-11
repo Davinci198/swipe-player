@@ -69,23 +69,26 @@ class ImagePagerAdapter(
         holder.pendingUri = key
         recyclaBitmapActual(holder, key)
         holder.image.setImageDrawable(null)
+        // un view reciclat cu zoom > 1 bloca paging-ul până la dublu-tap
+        (holder.image as? ZoomableImageView)?.resetZoom()
         holder.loading.visibility = View.VISIBLE
 
-        cache.get(key)?.let { bmp ->
-            if (holder.pendingUri == key && !bmp.isRecycled) {
-                holder.image.setImageBitmap(bmp)
-                holder.loading.visibility = View.GONE
-            }
+        val dinCache = cache.get(key)
+        if (dinCache != null && !dinCache.isRecycled) {
+            holder.image.setImageBitmap(dinCache)
+            holder.loading.visibility = View.GONE
             return
         }
+        // bitmap reciclat rămas în cache => îl scoatem și decodăm din nou (altfel spinner infinit)
+        if (dinCache != null) cache.remove(key)
 
         loaderQueue.execute {
             val bmp = decodeSampled(uri)
             if (bmp != null) cache.put(key, bmp)
             holder.image.post {
-                if (holder.pendingUri == key && bmp != null && !bmp.isRecycled) {
-                    holder.image.setImageBitmap(bmp)
-                }
+                // holder-ul poate fi deja legat de altă poză: nu-i atingem nici imaginea, nici spinner-ul
+                if (holder.pendingUri != key) return@post
+                if (bmp != null && !bmp.isRecycled) holder.image.setImageBitmap(bmp)
                 holder.loading.visibility = View.GONE
             }
         }
@@ -96,6 +99,7 @@ class ImagePagerAdapter(
         holder.pendingUri = null
         recicleazaDacaNuEInCache(holder)
         holder.image.setImageDrawable(null)
+        (holder.image as? ZoomableImageView)?.resetZoom()
     }
 
     private fun recyclaBitmapActual(holder: ImgVH, keyNou: String) {

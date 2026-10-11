@@ -28,12 +28,18 @@ TextureAtlasData* OpenGLFactory::_buildTextureAtlasData(TextureAtlasData* textur
         int pngSize = atlasInfo->second;
 
         int width, height, nrChannels;
-        unsigned char *data = stbi_load_from_memory(pngData, pngSize, &width, &height, &nrChannels, 0);
+        // Force 4 channels (RGBA) so grayscale/paletted/RGB images upload correctly.
+        unsigned char *data = stbi_load_from_memory(pngData, pngSize, &width, &height, &nrChannels, STBI_rgb_alpha);
 
         if (data)
         {
             auto* openGLAtlas = static_cast<OpenGLTextureAtlasData*>(textureAtlasData);
             
+            // Re-parsing into an existing atlas object: don't leak the previous texture.
+            if (openGLAtlas->textureID != 0) {
+                glDeleteTextures(1, &openGLAtlas->textureID);
+                openGLAtlas->textureID = 0;
+            }
             glGenTextures(1, &openGLAtlas->textureID);
             glBindTexture(GL_TEXTURE_2D, openGLAtlas->textureID);
             
@@ -42,11 +48,9 @@ TextureAtlasData* OpenGLFactory::_buildTextureAtlasData(TextureAtlasData* textur
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
-            if (nrChannels == 4) {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-            } else if (nrChannels == 3) {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            }
+            // Data is always tightly packed RGBA (forced above).
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
             stbi_image_free(data);
         }

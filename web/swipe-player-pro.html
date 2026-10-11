@@ -97,6 +97,7 @@ input[type=file]{display:none}
   var hidePlayTimer=null;
   var lastTap=0;
   var lastTapX=0;
+  var singleTapTimer=null; // tap simplu amanat, anulat daca vine al doilea tap (dublu tap)
 
   // ===== Gesturi unificate (derulare + lumina/volum), fara conflict =====
   // Zone laterale (in % din latime): margine stanga=0..15 (lumina),
@@ -151,7 +152,11 @@ input[type=file]{display:none}
 
   function togglePlay(){
     if(!list.length) return;
-    if(video.paused){ video.play(); showPlay(true); }
+    if(video.paused){
+      var p=video.play();
+      if(p && p.catch){ p.catch(function(){ showPlay(false); }); }
+      showPlay(true);
+    }
     else { video.pause(); showPlay(false); }
   }
 
@@ -219,7 +224,9 @@ input[type=file]{display:none}
 
   app.addEventListener('touchend', function(e){
     if(inTopBarOrBottom(e)) return;
-    if(isDrag || dragKind!==''){ isDrag=false; dragKind=''; return; } // a fost gest pe margine
+    var wasDrag=isDrag;
+    isDrag=false; dragKind='';
+    if(wasDrag) return; // a fost drag pe margine (lumina/volum); tap-urile pe margine merg mai departe
     var t=e.changedTouches[0];
     var dy=t.clientY - touchStartY;
     var dx=t.clientX - touchStartX;
@@ -228,11 +235,15 @@ input[type=file]{display:none}
     var isDouble=(now-lastTap)<300 && Math.abs(t.clientX-lastTapX)<80;
     if(absY<18 && absX<18){
       if(isDouble){
+        clearTimeout(singleTapTimer); singleTapTimer=null; // anuleaza togglePlay-ul primului tap
         if(t.clientX<window.innerWidth/2){ video.currentTime=Math.max(0,video.currentTime-10); seekL.classList.add('show'); setTimeout(function(){ seekL.classList.remove('show'); },500); }
         else { video.currentTime=Math.min(video.duration||9999,video.currentTime+10); seekR.style.opacity='1'; setTimeout(function(){ seekR.style.opacity='0'; },500); }
         lastTap=0; return;
       }
-      togglePlay(); lastTap=now; lastTapX=t.clientX; return;
+      lastTap=now; lastTapX=t.clientX;
+      clearTimeout(singleTapTimer);
+      singleTapTimer=setTimeout(function(){ singleTapTimer=null; togglePlay(); }, 300);
+      return;
     }
     if(absY>60 && absY>absX){ if(dy<0) next(); else prev(); }
     lastTap=0;
@@ -265,14 +276,17 @@ input[type=file]{display:none}
     if(e.code==='ArrowUp'){ prev(); e.preventDefault(); }
     if(e.code==='ArrowDown'){ next(); e.preventDefault(); }
     if(e.code==='Space'){ togglePlay(); e.preventDefault(); }
-    if(e.code==='ArrowLeft'){ video.currentTime=Math.max(0,video.currentTime-5); }
-    if(e.code==='ArrowRight'){ video.currentTime=Math.min(video.duration, video.currentTime+5); }
+    if(e.code==='ArrowLeft'){ if(!isFinite(video.duration)) return; video.currentTime=Math.max(0,video.currentTime-5); }
+    if(e.code==='ArrowRight'){ if(!isFinite(video.duration)) return; video.currentTime=Math.min(video.duration, video.currentTime+5); }
   });
 
   // file input + drag & drop
   document.getElementById('uploadBtn').addEventListener('click', function(){ fileInput.click(); });
   document.getElementById('emptyBtn').addEventListener('click', function(){ fileInput.click(); });
-  fileInput.addEventListener('change', function(){ if(this.files && this.files.length) loadList(this.files); });
+  fileInput.addEventListener('change', function(){
+    if(this.files && this.files.length) loadList(this.files);
+    this.value=''; // permite re-alegerea aceluiasi fisier
+  });
   app.addEventListener('dragover', function(e){ e.preventDefault(); });
   app.addEventListener('drop', function(e){
     e.preventDefault();
