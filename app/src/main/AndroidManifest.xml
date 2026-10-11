@@ -10,6 +10,10 @@
          Aplicația NU mai deschide automat ecranul de setări. tools:ignore suprima avertismentul. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Android 11+: fără asta resolveActivity() nu vede picker-ul File Manager și se cade mereu pe cel de sistem -->
+    <queries>
+        <package android:name="com.alphainventor.filemanager" />
+    </queries>
     <application
         android:allowBackup="true"
         android:label="Swipe Player"

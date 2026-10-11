@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private val TAG = "MainActivity"
     private val REQUEST_VIDEOS = 1001
     private val REQUEST_PHOTOS = 1003
+    private val FILE_MANAGER_PACKAGE = "com.alphainventor.filemanager"
+    private val FILE_MANAGER_PICKER = "$FILE_MANAGER_PACKAGE.activity.PickerActivity"
     private val PREFS = "swipe_uv"
     private val KEY_URIS = "uris_video"
     private val KEY_PHOTO_URIS = "uris_photo"
@@ -360,7 +362,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
         try {
             pickerDeschis = true // previne intrarea în PiP la deschiderea galeriei
-            startActivityForResult(intent, requestCode)
+            val picker = Intent(intent).setClassName(FILE_MANAGER_PACKAGE, FILE_MANAGER_PICKER)
+            if (picker.resolveActivity(packageManager) != null) {
+                startActivityForResult(picker, requestCode)
+            } else {
+                startActivityForResult(intent, requestCode)
+            }
         } catch (e: Exception) {
             pickerDeschis = false
             Toast.makeText(this, "Nu am găsit un picker de fișiere", Toast.LENGTH_LONG).show()
@@ -387,28 +394,28 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         val scrisAcordat = (data.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0
         val flagPersist = Intent.FLAG_GRANT_READ_URI_PERMISSION or
             (if (scrisAcordat) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
-        var esuate = 0
-        val uriAcces = uriSele.filter { uri ->
+        var temporare = 0
+        uriSele.forEach { uri ->
             try {
                 contentResolver.takePersistableUriPermission(uri, flagPersist)
-                true
             } catch (e: Exception) {
                 // reîncercăm doar cu READ (unii furnizori nu acordă WRITE persistabil)
                 try {
                     contentResolver.takePersistableUriPermission(
                         uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    true
                 } catch (e2: Exception) {
+                    // pickerele terțe (ex. File Manager) dau adesea doar acces temporar:
+                    // fișierul se poate reda acum, dar accesul nu supraviețuiește repornirii
                     Log.w(TAG, "nu pot persista accesul: $e2")
-                    esuate++
-                    false
+                    temporare++
                 }
             }
         }
-        if (esuate > 0) {
+        val uriAcces = uriSele
+        if (temporare > 0) {
             Toast.makeText(
                 this,
-                "$esuate fișier(e) nu au putut fi adăugate (acces permanent refuzat)",
+                "$temporare fișier(e) au doar acces temporar și pot dispărea după repornire",
                 Toast.LENGTH_LONG
             ).show()
         }

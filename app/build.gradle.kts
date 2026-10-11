@@ -41,11 +41,13 @@ android {
         }
     }
 
+    val sharedStoreFile = System.getenv("RELEASE_STORE_FILE")?.let { file(it) }
+    val sharedSigningAvailable = sharedStoreFile?.isFile == true
+
     signingConfigs {
         create("release") {
-            val storeFilePath = System.getenv("RELEASE_STORE_FILE")
-            if (storeFilePath != null && file(storeFilePath).exists()) {
-                storeFile = file(storeFilePath)
+            if (sharedSigningAvailable) {
+                storeFile = sharedStoreFile
                 storePassword = System.getenv("RELEASE_STORE_PASSWORD")
                 keyAlias = System.getenv("RELEASE_KEY_ALIAS")
                 keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
@@ -58,13 +60,17 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            val storeFilePath = System.getenv("RELEASE_STORE_FILE")
-            if (storeFilePath != null && file(storeFilePath).exists()) {
+            if (sharedSigningAvailable) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
         debug {
             isDebuggable = true
+            // CI debug artifacts use the same keystore as release when available,
+            // so adb install -r works without uninstalling the existing app.
+            if (sharedSigningAvailable) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             // Reducere dimensiune APK în debug: doar arm64-v8a
             // (suprascrie abiFilters din defaultConfig; .so mai puține -> APK mai mic)
             ndk {
