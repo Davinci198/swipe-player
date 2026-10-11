@@ -21,6 +21,8 @@ class ThumbnailAdapter(
     private val onClick: (position: Int) -> Unit
 ) : androidx.recyclerview.widget.RecyclerView.Adapter<ThumbnailAdapter.ThVH>() {
 
+    private val PAYLOAD_SELECTIE = "selectie"
+
     private val loader = Executors.newSingleThreadExecutor { r ->
         Thread(r, "thumb-decoder").apply { isDaemon = true }
     }
@@ -50,8 +52,22 @@ class ThumbnailAdapter(
         val previous = currentIndex
         if (previous == next) return
         currentIndex = next
-        if (previous in items.indices) notifyItemChanged(previous)
-        if (next in items.indices) notifyItemChanged(next)
+        // payload => doar starea de selecție se actualizează (fără re-decodare / pâlpâire)
+        if (previous in items.indices) notifyItemChanged(previous, PAYLOAD_SELECTIE)
+        if (next in items.indices) notifyItemChanged(next, PAYLOAD_SELECTIE)
+    }
+
+    private fun aplicaSelectie(holder: ThVH, position: Int) {
+        holder.itemView.isSelected = position == currentIndex
+        holder.image.alpha = if (position == currentIndex) 1f else 0.58f
+    }
+
+    override fun onBindViewHolder(holder: ThVH, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isEmpty()) {
+            onBindViewHolder(holder, position)
+            return
+        }
+        aplicaSelectie(holder, position)
     }
 
     override fun onBindViewHolder(holder: ThVH, position: Int) {
@@ -59,8 +75,7 @@ class ThumbnailAdapter(
         val key = uri.toString()
         holder.pending = key
         holder.image.setImageDrawable(null)
-        holder.itemView.isSelected = position == currentIndex
-        holder.image.alpha = if (position == currentIndex) 1f else 0.58f
+        aplicaSelectie(holder, position)
         holder.itemView.contentDescription = "Deschide poza ${position + 1}"
         holder.itemView.setOnClickListener { onClick(position) }
 

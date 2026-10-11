@@ -21,6 +21,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.ui.PlayerView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
@@ -48,8 +49,9 @@ class VideoPagerAdapter(
     var currentVolume: Float = initialVolume ?: 1f
         set(v) { field = v.coerceIn(0f, 1f) }
 
-    // selecttor de track comun, folosit pentru a limita rezoluția de decodare a tuturor player-urilor
-    private val trackSelector = DefaultTrackSelector(context)
+    // câte un selector de track PER PLAYER (un DefaultTrackSelector nu poate fi partajat:
+    // release() pe un player îl elibera pentru toți). Rezoluția se aplică pe fiecare.
+    private val selectorPentru = HashMap<ExoPlayer, DefaultTrackSelector>()
 
     // rezoluție de redare aleasă în setări (Auto = foarte mare)
     var currentResolutie: Pair<Int, Int> = Pair(7680, 4320) // Auto / acceptă tot
@@ -95,31 +97,47 @@ class VideoPagerAdapter(
     private val MAX_POOL = 3
 
     // ===== Pinch ZOOM pe video (experimental, aditiv; nu atinge gesturile cu un deget) =====
+    // View-ul ciupit acum (setat la fiecare eveniment de pinch, înainte de detector).
+    // Zoom-ul curent se citește din scaleX-ul view-ului, NU dintr-o variabilă comună,
+    // ca bind-ul unei pagini vecine (prefetch) să nu reseteze zoom-ul paginii vizibile.
     private var pinchPlayerView: PlayerView? = null
-    private var videoZoom = 1f
-    private var pinchActive = false // rămâne adevărat până scapi ultimul deget
 
     private val pinchListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val pv = pinchPlayerView ?: return false
-            val newZoom = (videoZoom * detector.scaleFactor).coerceIn(1f, 4f)
+            val newZoom = (pv.scaleX * detector.scaleFactor).coerceIn(1f, 4f)
             pv.scaleX = newZoom
             pv.scaleY = newZoom
             // centrare pe focalizare (simplu: pivot la centru)
             pv.pivotX = pv.width / 2f
             pv.pivotY = pv.height / 2f
-            videoZoom = newZoom
             return true
         }
     }
     private val pinchDetector = ScaleGestureDetector(context, pinchListener)
 
+    /** Resetează zoom-ul DOAR pe view-ul dat (nu atinge alte pagini). */
     private fun resetVideoZoom(p: PlayerView?) {
         p?.also {
             it.scaleX = 1f
             it.scaleY = 1f
+            it.translationX = 0f
+            it.translationY = 0f
         }
-        videoZoom = 1f
+    }
+
+    /** Aplică rezoluția curentă ([currentResolutie]) pe selectorul unui player. */
+    private fun aplicaRezolutie(selector: DefaultTrackSelector) {
+        try {
+            val (w, h) = currentResolutie
+            val params = selector.buildUponParameters()
+                .setMaxVideoSize(w, h)
+                .setForceHighestSupportedBitrate(false) // nu forțăm cea mai mare rată de bit
+                .build()
+            selector.setParameters(params)
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare aplicare rezoluție", e)
+        }
     }
 
     private fun acquirePlayer(): ExoPlayer {
@@ -127,10 +145,18 @@ class VideoPagerAdapter(
         if (pool.isNotEmpty()) {
             p = pool.removeFirst()
         } else {
-            p = ExoPlayer.Builder(context)
-                .setTrackSelector(trackSelector)
-                .setAudioAttributes(AudioAttributes.DEFAULT, true) // gestionează audio focus
+            val selector = DefaultTrackSelector(context)
+            aplicaRezolutie(selector)
+            // audio focus gestionat de ExoPlayer => pauză automată la apeluri / pierdere focus
+            val atributeAudio = AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
+            p = ExoPlayer.Builder(context)
+                .setTrackSelector(selector)
+                .setAudioAttributes(atributeAudio, true)
+                .build()
+            selectorPentru[p] = selector
             // listenerul (wrapper per player, care închide DOAR acest [p]) se atașează
             // o singură dată, la crearea playerului. La reutilizarea din pool NU se mai adaugă
             // alt listener => fără leak / duplicate callbacks / salvare de progres greșită.
@@ -225,7 +251,30 @@ class VideoPagerAdapter(
         p.pause()
         p.stop()
         p.clearMediaItems()
-        if (pool.size < MAX_POOL) pool.addLast(p) else p.release()
+        if (pool.size < MAX_POOL) {
+            pool.addLast(p)
+        } else {
+            selectorPentru.remove(p) // ExoPlayer.release() eliberează și selectorul lui
+            p.release()
+        }
+    }
+
+    /**
+     * Desprinde playerul [p] de [holder]: salvează progresul, îl scoate din TOATE mapările
+     * (după valoare, nu după adapterPosition — care poate fi NO_POSITION) și îl întoarce în pool.
+     */
+    private fun detaseazaPlayer(holder: VH, p: ExoPlayer) {
+        try {
+            if (pozitiePentru(p) >= 0) salveazaProgres(numePentru(p), p, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare salvare progres la detașare", e)
+        }
+        live.entries.removeAll { it.value === p }
+        playerHolder.remove(p)
+        if (holder.playerView.player === p) holder.playerView.player = null
+        if (playerActiv === p) playerActiv = null
+        releasePlayer(p) // return în pool, nu eliberăm neapărat
+        if (holder.player === p) holder.player = null
     }
 
     /**
@@ -258,10 +307,8 @@ class VideoPagerAdapter(
             pool.clear()
             playerHolder.clear()
             playerActiv = null
-            // BUG (leak): trackSelector-ul comun nu era eliberat niciodată; la fiecare
-            // "Alege videoclipuri" se crea un adapter nou => un DefaultTrackSelector
-            // nou per instanță, fiecare cu listener-e interne pe playerii eliberați.
-            try { trackSelector.release() } catch (e: Exception) { }
+            // fiecare player și-a eliberat propriul DefaultTrackSelector la release()
+            selectorPentru.clear()
         } catch (e: Exception) {
             Log.e(TAG, "Eroare eliberare playere", e)
         }
@@ -381,6 +428,9 @@ class VideoPagerAdapter(
 
         // stare controller (pentru toggle pe tap simplu) - locală pe ViewHolder
         var controllerVisibil = false
+
+        // pinch zoom în curs pe această pagină (rămâne adevărat până scapi ultimul deget)
+        var pinchActive = false
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -392,8 +442,13 @@ class VideoPagerAdapter(
         // Un bind nou poate reutiliza holder-ul fără onViewRecycled (de ex. notifyItemChanged);
         // anulăm callback-urile vechi înainte să înregistrăm starea noului videoclip.
         holder.itemView.removeCallbacks(holder.hideButtonsRunnable)
-        holder.itemView.removeCallbacks(holder.hideIndicatorsRunnable)
+        // hideIndicators e postat pe touchIntercept => îl anulăm de pe același view
+        holder.touchIntercept.removeCallbacks(holder.hideIndicatorsRunnable)
         holder.controllerVisibil = false
+        holder.pinchActive = false
+        // Rebind fără recycle: playerul vechi trebuie desprins/returnat în pool,
+        // altfel rămâne în `live`/`playerHolder` sub o cheie veche (leak / dublură).
+        holder.player?.let { vechi -> detaseazaPlayer(holder, vechi) }
 
         val uri = items[position]
         val videoName = names.getOrElse(position) { "Video ${position + 1}" }
@@ -424,13 +479,16 @@ class VideoPagerAdapter(
             }
             val istoric = memoryManager.getIstoric(mediaId)
             if (istoric.isNotEmpty()) {
-                val durataMs = player.duration
-                val poz = (istoric.last()["pozitie"] as? Int ?: 0) * 1000L
-                // durataMs poate fi C.TIME_UNSET (negativ) înainte de prepare() —
-                // în acel caz permitem seek-ul (garda reală e "poz < durata-2s");
-                // condiția `durataMs > 0` ar bloca TOTAL restaurarea progresului.
-                if (poz > 0 && (durataMs <= 0 || poz < durataMs - 2000)) {
-                    player.seekTo(poz)
+                // player.duration e C.TIME_UNSET înainte de prepare() => folosim durata și
+                // progresul SALVATE în istoric. Un video terminat / aproape de final pornește
+                // de la 0, altfel ar intra direct în STATE_ENDED și autoplay ar sări pagina.
+                val intrare = istoric.last()
+                val pozMs = (intrare["pozitie"] as? Int ?: 0) * 1000L
+                val durataMs = (intrare["durata"] as? Int ?: 0) * 1000L
+                val progres = intrare["progres"] as? Int ?: 0
+                val reluare = pozitieDeReluare(pozMs, durataMs, progres)
+                if (reluare > 0L) {
+                    player.seekTo(reluare)
                 }
             }
         } catch (e: Exception) {
@@ -448,7 +506,9 @@ class VideoPagerAdapter(
             if (holder.controllerVisibil) {
                 holder.btnSeekBack.visibility = View.GONE
                 holder.btnSeekFwd.visibility = View.GONE
-                holder.dragMod = 0
+                // NU resetăm dragMod aici: runnable-ul poate rula în mijlocul unui gest.
+                // Controllerul s-a ascuns singur după timeout => următorul tap îl reafișează.
+                holder.controllerVisibil = false
             }
         }
         holder.hideButtonsRunnable = hideButtons
@@ -493,7 +553,7 @@ class VideoPagerAdapter(
                     return true
                 }
                 override fun onDoubleTap(e: MotionEvent): Boolean {
-                    if (videoZoom > 1f) {
+                    if (holder.playerView.scaleX > 1f) {
                         resetVideoZoom(holder.playerView) // dublu-tap = reset zoom video
                     } else {
                         togglePlay(holder, player) // 2 tap = play/pause
@@ -511,13 +571,18 @@ class VideoPagerAdapter(
             // PINCH ZOOM pe video: cu două degete, doar zoom (gesturile cu un deget nu se ating).
             // Chiar și după ce ridici un deget (pointerCount=1) rămânem în modul pinch până
             // la ACTION_UP, ca să NU se combine cu luminozitatea/volumul (bug „zip" final).
-            if (event.pointerCount > 1) pinchActive = true
-            if (event.pointerCount > 1 || pinchActive) {
-                pinchPlayerView = holder.playerView
+            if (event.pointerCount > 1 && !h.pinchActive) {
+                h.pinchActive = true
+                // ViewPager2 să nu fure pinch-ul ca swipe vertical
+                requestDisallowIntercept(view, true)
+            }
+            if (event.pointerCount > 1 || h.pinchActive) {
+                pinchPlayerView = h.playerView
                 pinchDetector.onTouchEvent(event)
                 if (event.actionMasked == MotionEvent.ACTION_UP ||
                     event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                    pinchActive = false
+                    h.pinchActive = false
+                    requestDisallowIntercept(view, false)
                 }
                 return@setOnTouchListener true
             }
@@ -669,20 +734,16 @@ class VideoPagerAdapter(
         // BUG: la recycle, un "hideButtons" postDelayed putea rula PESTE noua stare
         // (butoanele ⏪/⏩ dispar brusc la bind-ul următor) + cleanup pending callbacks
         holder.itemView.removeCallbacks(holder.hideButtonsRunnable)
-        holder.itemView.removeCallbacks(holder.hideIndicatorsRunnable)
+        // hideIndicators e postat pe touchIntercept => îl anulăm de pe același view
+        holder.touchIntercept.removeCallbacks(holder.hideIndicatorsRunnable)
         holder.controllerVisibil = false
+        holder.pinchActive = false
         hideIndicators(holder)
-        val position = holder.adapterPosition
-        if (position != RecyclerView.NO_POSITION) {
-            val videoName = names.getOrElse(position) { "unknown" }
-            holder.player?.let { salveazaProgres(videoName, it, null) }
-            live.remove(position)
-        }
-        holder.playerView.player = null
+        // Scoatem playerul din `live` DUPĂ VALOARE (adapterPosition poate fi NO_POSITION,
+        // iar atunci intrarea rămânea => același player sub două chei după reutilizare din pool).
         val p = holder.player
-        if (playerActiv === p) playerActiv = null
-        p?.let { playerHolder.remove(it) } // scoatem maparea player->holder
-        if (p != null) releasePlayer(p) // return în pool, nu eliberăm neapărat
+        if (p != null) detaseazaPlayer(holder, p)
+        holder.playerView.player = null
         holder.player = null
     }
 
@@ -843,19 +904,14 @@ class VideoPagerAdapter(
 
     /**
      * Setați rezoluția maximă de decodare (selectată în setări). Se aplică pe
-     * selecția de track comună, deci afectează toți player-urile (existente și viitoare).
+     * selectorul fiecărui player (în uz + din pool); playerii creați ulterior o
+     * preiau din [currentResolutie] la creare.
      * Ex: Auto=7680x4320, 4K=3840x2160, 2K=2560x1440, 1080p=1920x1080, 720p=1280x720.
      */
     fun setResolutie(w: Int, h: Int) {
         currentResolutie = Pair(w, h)
-        try {
-            val params = trackSelector.buildUponParameters()
-                .setMaxVideoSize(w, h)
-                .setForceHighestSupportedBitrate(false) // nu forțăm cea mai mare rată de bit
-                .build()
-            trackSelector.setParameters(params)
-        } catch (e: Exception) {
-            Log.e(TAG, "Eroare aplicare rezoluție", e)
+        for (selector in selectorPentru.values) {
+            aplicaRezolutie(selector)
         }
     }
 

@@ -67,6 +67,11 @@ class MemoryManager private constructor(context: Context) {
         pozitieSecunde: Int,
         durataSecunde: Int
     ) {
+        // id gol = player fără poziție validă; NU suprascriem o intrare comună ""
+        if (id.isBlank()) {
+            Log.w(TAG, "Salvare istoric ignorată: id gol ($nume)")
+            return
+        }
         try {
             val arr = getJsonArray(KEY_HISTORY)
             val data = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
@@ -84,7 +89,10 @@ class MemoryManager private constructor(context: Context) {
                 put("pozitie", pozitieSecunde)
                 put("durata", durataSecunde)
             }
-            if (index >= 0) arr.put(index, entry) else arr.put(entry)
+            // La update mutăm intrarea la final (cel mai recent vizionat), ca limitarea de
+            // mai jos să elimine intrarea vizionată cel mai demult (LRU), nu cea mai veche inserată.
+            if (index >= 0) arr.remove(index)
+            arr.put(entry)
 
             // Limitare strictă la MAX_HISTORY (împiedică creșterea infinită)
             while (arr.length() > MAX_HISTORY) {
