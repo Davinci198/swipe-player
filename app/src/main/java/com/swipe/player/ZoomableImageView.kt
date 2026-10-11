@@ -25,6 +25,7 @@ class ZoomableImageView @JvmOverloads constructor(
     private var zoom = 1f                  // zoom-ul utilizatorului (1x..5x)
     private var lastX = 0f
     private var lastY = 0f
+    private var pointerActiv = MotionEvent.INVALID_POINTER_ID
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -46,6 +47,8 @@ class ZoomableImageView @JvmOverloads constructor(
                 val target = 3f
                 displayMatrix.postScale(target, target, e.x, e.y)
                 zoom = target
+                // tap lângă margine (ex. în barele negre) ar împinge poza în afara ecranului
+                clampPan()
             } else {
                 resetZoom()
             }
@@ -86,7 +89,8 @@ class ZoomableImageView @JvmOverloads constructor(
         resetZoom()
     }
 
-    private fun resetZoom() {
+    /** revenire la 1x; apelat și de adapter la bind/recycle, ca un view reciclat să nu rămână mărit */
+    fun resetZoom() {
         zoom = 1f
         displayMatrix.set(baseMatrix)
         imageMatrix = displayMatrix
@@ -136,6 +140,7 @@ class ZoomableImageView @JvmOverloads constructor(
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                pointerActiv = event.getPointerId(0)
                 lastX = event.x
                 lastY = event.y
                 return true
@@ -144,11 +149,32 @@ class ZoomableImageView @JvmOverloads constructor(
                 disallowParent(true)
                 return true
             }
+            MotionEvent.ACTION_POINTER_UP -> {
+                // BUG: după pinch, dacă se ridica degetul 0, lastX/lastY rămâneau pe el
+                // => următorul MOVE calcula distanța dintre degete și poza "sărea".
+                val idx = event.actionIndex
+                if (event.getPointerId(idx) == pointerActiv) {
+                    val nou = if (idx == 0) 1 else 0
+                    pointerActiv = event.getPointerId(nou)
+                    lastX = event.getX(nou)
+                    lastY = event.getY(nou)
+                }
+                return true
+            }
             MotionEvent.ACTION_MOVE -> {
-                val dx = event.x - lastX
-                val dy = event.y - lastY
-                lastX = event.x
-                lastY = event.y
+                var idx = event.findPointerIndex(pointerActiv)
+                if (idx < 0) {
+                    idx = 0
+                    pointerActiv = event.getPointerId(0)
+                    lastX = event.getX(0)
+                    lastY = event.getY(0)
+                }
+                val x = event.getX(idx)
+                val y = event.getY(idx)
+                val dx = x - lastX
+                val dy = y - lastY
+                lastX = x
+                lastY = y
                 if (event.pointerCount > 1) {
                     // pinch deja gestionat de scaleDetector
                     disallowParent(true)
@@ -166,6 +192,7 @@ class ZoomableImageView @JvmOverloads constructor(
                 return false
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                pointerActiv = MotionEvent.INVALID_POINTER_ID
                 disallowParent(zoom > 1f)
                 return true
             }
