@@ -158,18 +158,18 @@ constructor(context: Context, attrs: AttributeSet? = null, zOrderOnTop: Boolean 
         }
     }
 
+    // GLSurfaceView.onPause()/onResume() must be called on the UI thread: they block
+    // waiting for the GL thread, so calling them from inside queueEvent (i.e. on the
+    // GL thread itself) deadlocks. Only the native calls are queued onto the GL thread.
     override fun onPause() {
-        queueEvent {
-            super.onPause()
-            JniBridge.onPause()
-        }
+        // Queue the native pause first so it runs before the GL thread is paused.
+        queueEvent { JniBridge.onPause() }
+        super.onPause()
     }
 
     override fun onResume() {
-        queueEvent {
-            super.onResume()
-            JniBridge.onResume()
-        }
+        super.onResume()
+        queueEvent { JniBridge.onResume() }
     }
 
     fun destroy() {

@@ -4,6 +4,7 @@
 #include "dragonBones/factory/BaseFactory.h"
 #include "dragonBones/model/TextureAtlasData.h"
 #include "dragonBones/armature/IArmatureProxy.h"
+#include <GLES2/gl2.h>
 
 DRAGONBONES_NAMESPACE_BEGIN
 
@@ -16,12 +17,13 @@ class OpenGLTextureData : public TextureData
     BIND_CLASS_TYPE_A(OpenGLTextureData);
 
 public:
-    unsigned int textureID;
+    // Initialized here because BIND_CLASS_TYPE_A's constructor calls _onClear().
+    unsigned int textureID = 0;
 
 protected:
     void _onClear() override {
         TextureData::_onClear();
-        textureID = 0;
+        textureID = 0; // Not owned: the GL texture belongs to the parent atlas.
     }
 };
 
@@ -31,11 +33,20 @@ class OpenGLTextureAtlasData : public TextureAtlasData
     BIND_CLASS_TYPE_A(OpenGLTextureAtlasData);
 
 public:
-    unsigned int textureID; // To hold the OpenGL texture ID
+    // To hold the OpenGL texture ID. Initialized here because BIND_CLASS_TYPE_A's
+    // constructor calls _onClear(), which reads textureID.
+    unsigned int textureID = 0;
 
 protected:
     void _onClear() override {
         TextureAtlasData::_onClear();
+        // NOTE: must run on the GL thread with the owning context current. Atlas data is
+        // only cleared via BaseFactory::clear()/returnToPool from JNI entry points that run
+        // on the GL thread. If the context was lost, the name is stale and the call is a
+        // harmless no-op/GL error.
+        if (textureID != 0) {
+            glDeleteTextures(1, &textureID);
+        }
         textureID = 0;
     }
 

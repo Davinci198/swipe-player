@@ -29,6 +29,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+    kotlinOptions {
+        // Match compileOptions. Avoids jvmToolchain(8), which requires a JDK 8 install
+        // (CI only has JDK 17 and no toolchain resolver is configured).
+        jvmTarget = "1.8"
+    }
     externalNativeBuild {
         cmake {
             path = file("CMakeLists.txt")
@@ -41,9 +46,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
-}
-kotlin {
-    jvmToolchain(8)
 }
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
