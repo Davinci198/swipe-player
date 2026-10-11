@@ -556,24 +556,16 @@ class VideoPagerAdapter(
                     val dy = event.y - h.dragStartY
                     val w87 = view.width.toFloat().coerceAtLeast(1f)
                     if (h.dragMod == 0) {
-                        val isRight = h.dragStartX > w87 * 0.78f
-                        val isLeft = h.dragStartX < w87 * 0.22f
-                        // VOLUM/BRIGHTNESS: doar pe marginile reale, ca centrul să rămână
-                        // liber pentru swipe-ul vertical dintre videoclipuri.
-                        if (isRight && Math.abs(dy) > 8) {
-                            h.dragMod = 2
-                        } else if (isLeft && Math.abs(dy) > 8) {
-                            h.dragMod = 1
-                        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
-                            h.dragMod = 4 // vertical TikTok -> lăsăm ViewPager-ul
+                        h.dragMod = detectGestureMode(h.dragStartX, w87, dx, dy)
+                        if (h.dragMod == 4) {
                             // ACTION_DOWN a fost deja consumat de overlay; un return false
                             // ulterior nu pasează automat gestul către ViewPager2. Eliberăm
                             // interceptarea, iar părintele va prelua următorul MOVE.
                             requestDisallowIntercept(view, false)
                             return@setOnTouchListener true
-                        } else if (Math.abs(dx) > 12) {
-                            h.dragMod = 3 // seek orizontal
-                            // anti-furt ViewPager2: reconfirmăm intercept pe TOȚI părinții ca seek-ul să nu fie furat
+                        } else if (h.dragMod in 1..3) {
+                            // Volumul/luminozitatea, la fel ca seek-ul, trebuie să primească
+                            // toate MOVE-urile; altfel ViewPager2 fură verticalul după primul.
                             requestDisallowIntercept(view, true)
                         }
                     }
