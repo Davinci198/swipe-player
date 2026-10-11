@@ -556,24 +556,16 @@ class VideoPagerAdapter(
                     val dy = event.y - h.dragStartY
                     val w87 = view.width.toFloat().coerceAtLeast(1f)
                     if (h.dragMod == 0) {
-                        val isRight = h.dragStartX > w87 * 0.78f
-                        val isLeft = h.dragStartX < w87 * 0.22f
-                        // VOLUM/BRIGHTNESS: doar pe marginile reale, ca centrul să rămână
-                        // liber pentru swipe-ul vertical dintre videoclipuri.
-                        if (isRight && Math.abs(dy) > 8) {
-                            h.dragMod = 2
-                        } else if (isLeft && Math.abs(dy) > 8) {
-                            h.dragMod = 1
-                        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 15) {
-                            h.dragMod = 4 // vertical TikTok -> lăsăm ViewPager-ul
+                        h.dragMod = detectGestureMode(h.dragStartX, w87, dx, dy)
+                        if (h.dragMod == 4) {
                             // ACTION_DOWN a fost deja consumat de overlay; un return false
                             // ulterior nu pasează automat gestul către ViewPager2. Eliberăm
                             // interceptarea, iar părintele va prelua următorul MOVE.
                             requestDisallowIntercept(view, false)
                             return@setOnTouchListener true
-                        } else if (Math.abs(dx) > 12) {
-                            h.dragMod = 3 // seek orizontal
-                            // anti-furt ViewPager2: reconfirmăm intercept pe TOȚI părinții ca seek-ul să nu fie furat
+                        } else if (h.dragMod in 1..3) {
+                            // Volumul/luminozitatea, la fel ca seek-ul, trebuie să primească
+                            // toate MOVE-urile; altfel ViewPager2 fură verticalul după primul.
                             requestDisallowIntercept(view, true)
                         }
                     }
@@ -592,7 +584,7 @@ class VideoPagerAdapter(
                         2 -> { // VOLUME continuu, identic cu lumina: dy * 0.002f incremental (sus = mai tare)
                             currentVolume = (currentVolume - dy * 0.002f).coerceIn(0f, 1f)
                             h.dragStartY = event.y // delta incremental, ca la luminozitate
-                            aplicaVolumSistem(currentVolume) // volum sistem continuu (nu trepte)
+                            aplicaVolumSistem(currentVolume, afiseazaUi = false) // fără overlay SystemUI la fiecare pixel
                             onVolumeChange?.invoke(currentVolume)
                             showVerticalIndicator(h, 1, currentVolume)
                             true
@@ -621,6 +613,9 @@ class VideoPagerAdapter(
                     if (h.dragMod == 3 && h.seekActive && h.seekTargetMs >= 0L) {
                         player.seekTo(h.seekTargetMs)
                         h.seekTargetMs = -1L
+                    }
+                    if (h.dragMod == 2 && event.actionMasked == MotionEvent.ACTION_UP) {
+                        aplicaVolumSistem(currentVolume, afiseazaUi = true)
                     }
                     // ascunde overlay-urile cu un mic delay (spring-like), ca în demo
                     view.removeCallbacks(hideIndicatorsRunnable)
@@ -745,14 +740,15 @@ class VideoPagerAdapter(
     private fun audioManager(): AudioManager? =
         try { context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager } catch (e: Exception) { null }
 
-    fun aplicaVolumSistem(v: Float) {
+    fun aplicaVolumSistem(v: Float, afiseazaUi: Boolean = true) {
         try {
             val am = audioManager() ?: return
             val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val newVol = (v.coerceIn(0f, 1f) * max).toInt()
-            // FLAG_SHOW_UI => apare sliderul de volum al sistemului (fara click sonor
-            // FLAG_PLAY_SOUND, ca sa nu tacaia continuu in timpul swipe-ului).
-            am.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, AudioManager.FLAG_SHOW_UI)
+            // În timpul swipe-ului nu deschidem SystemUI la fiecare pixel; la ACTION_UP
+            // se afișează o singură dată valoarea finală.
+            val flags = if (afiseazaUi) AudioManager.FLAG_SHOW_UI else 0
+            am.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, flags)
             Log.d("VOLUME", "setStreamMusic=$newVol/$max ratio=${"%.2f".format(v)}")
         } catch (e: Exception) {
             Log.e(TAG, "Eroare setare volum sistem", e)
@@ -838,7 +834,7 @@ class VideoPagerAdapter(
 
     fun setVolume(v: Float) {
         currentVolume = v
-        aplicaVolumSistem(currentVolume)
+        aplicaVolumSistem(currentVolume, afiseazaUi = false)
     }
     fun setBrightness(b: Float) {
         currentBrightness = b
