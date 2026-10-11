@@ -57,6 +57,24 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private var currentCtrlPhoto = true
     private var currentPlaylist = true
 
+    companion object {
+        // chei pentru arguments / savedInstanceState (valorile supraviețuiesc recreării fragmentului)
+        private const val ARG_BRIGHTNESS = "arg_brightness"
+        private const val ARG_VOLUME = "arg_volume"
+        private const val ARG_RES_H = "arg_res_h"
+        private const val ARG_SEEK_STEP = "arg_seek_step"
+        private const val ARG_BACKGROUND_PLAY = "arg_background_play"
+        private const val ARG_AUTO_ORDER = "arg_auto_order"
+        private const val ARG_CTRL_VIDEO = "arg_ctrl_video"
+        private const val ARG_CTRL_PHOTO = "arg_ctrl_photo"
+        private const val ARG_PLAYLIST = "arg_playlist"
+    }
+
+    /**
+     * Valorile inițiale se scriu în `arguments` (NU doar în câmpuri), ca să nu se piardă
+     * când sistemul recreează fragmentul (rotire, process death etc.).
+     * Trebuie apelat ÎNAINTE de show().
+     */
     fun setInitial(
         brightness: Float,
         volume: Float,
@@ -77,11 +95,59 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         currentCtrlVideo = ctrlVideo
         currentCtrlPhoto = ctrlPhoto
         currentPlaylist = playlist
+        val args = arguments ?: Bundle()
+        scrieStare(args)
+        arguments = args
+    }
+
+    private fun scrieStare(b: Bundle) {
+        b.putFloat(ARG_BRIGHTNESS, currentBrightness)
+        b.putFloat(ARG_VOLUME, currentVolume)
+        b.putInt(ARG_RES_H, currentResH)
+        b.putInt(ARG_SEEK_STEP, currentSeekStep)
+        b.putBoolean(ARG_BACKGROUND_PLAY, currentBackgroundPlay)
+        b.putBoolean(ARG_AUTO_ORDER, currentAutoOrder)
+        b.putBoolean(ARG_CTRL_VIDEO, currentCtrlVideo)
+        b.putBoolean(ARG_CTRL_PHOTO, currentCtrlPhoto)
+        b.putBoolean(ARG_PLAYLIST, currentPlaylist)
+    }
+
+    private fun citesteStare(b: Bundle) {
+        currentBrightness = b.getFloat(ARG_BRIGHTNESS, currentBrightness).coerceIn(0.15f, 1f)
+        currentVolume = b.getFloat(ARG_VOLUME, currentVolume).coerceIn(0f, 1f)
+        currentResH = b.getInt(ARG_RES_H, currentResH)
+        currentSeekStep = b.getInt(ARG_SEEK_STEP, currentSeekStep).coerceIn(2, 30)
+        currentBackgroundPlay = b.getBoolean(ARG_BACKGROUND_PLAY, currentBackgroundPlay)
+        currentAutoOrder = b.getBoolean(ARG_AUTO_ORDER, currentAutoOrder)
+        currentCtrlVideo = b.getBoolean(ARG_CTRL_VIDEO, currentCtrlVideo)
+        currentCtrlPhoto = b.getBoolean(ARG_CTRL_PHOTO, currentCtrlPhoto)
+        currentPlaylist = b.getBoolean(ARG_PLAYLIST, currentPlaylist)
     }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
+        // Listener-ul vine din Activity (nu e lambda reținută în fragment) => se re-obține
+        // automat și după recrearea fragmentului.
         if (listener == null) listener = context as? Listener ?: activity as? Listener
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // starea salvată (modificări făcute în panou) are prioritate față de valorile inițiale
+        val sursa = savedInstanceState ?: arguments
+        if (sursa != null) citesteStare(sursa)
+        // fără Listener (gazdă neașteptată) panoul n-ar avea efect => îl închidem
+        if (listener == null) dismissAllowingStateLoss()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        scrieStare(outState)
+    }
+
+    override fun onDetach() {
+        super.onDetach()
+        listener = null
     }
 
     override fun onStart() {
@@ -142,14 +208,20 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             title = "Redare în fundal",
             desc = "Continuă sunetul când blochezi ecranul sau minimizezi aplicația.",
             initial = currentBackgroundPlay
-        ) { activat -> listener?.onBackgroundPlayChange(activat) }
+        ) { activat ->
+            currentBackgroundPlay = activat
+            listener?.onBackgroundPlayChange(activat)
+        }
         val swBackground = rowBg.switch
         root.addView(rowBg.view)
         val rowAuto = switchRow(
             title = "Autoplay continuu",
             desc = "Trece automat la videoclipul următor când se termină cel curent.",
             initial = currentAutoOrder
-        ) { activat -> listener?.onAutoOrderChange(activat) }
+        ) { activat ->
+            currentAutoOrder = activat
+            listener?.onAutoOrderChange(activat)
+        }
         val swAuto = rowAuto.switch
         root.addView(rowAuto.view)
 
@@ -158,21 +230,30 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             title = "Video: butoane de control",
             desc = "Afișează play/pause și derularea la atingere, în modul Video.",
             initial = currentCtrlVideo
-        ) { activat -> listener?.onCtrlVideoChange(activat) }
+        ) { activat ->
+            currentCtrlVideo = activat
+            listener?.onCtrlVideoChange(activat)
+        }
         val swCtrlVideo = rowCtrlVideo.switch
         root.addView(rowCtrlVideo.view)
         val rowCtrlPhoto = switchRow(
             title = "Poze: butoane de control",
             desc = "Afișează luminozitatea, volumul, redenumirea, ștergerea și favoritele.",
             initial = currentCtrlPhoto
-        ) { activat -> listener?.onCtrlPhotoChange(activat) }
+        ) { activat ->
+            currentCtrlPhoto = activat
+            listener?.onCtrlPhotoChange(activat)
+        }
         val swCtrlPhoto = rowCtrlPhoto.switch
         root.addView(rowCtrlPhoto.view)
         val rowPlaylist = switchRow(
             title = "Liste de redare (miniaturi)",
             desc = "Afișează navigarea rapidă prin miniaturile pozelor.",
             initial = currentPlaylist
-        ) { activat -> listener?.onPlaylistChange(activat) }
+        ) { activat ->
+            currentPlaylist = activat
+            listener?.onPlaylistChange(activat)
+        }
         val swPlaylist = rowPlaylist.switch
         root.addView(rowPlaylist.view)
 
@@ -184,6 +265,9 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             thumbTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 179, 0))
             setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    // doar mișcările utilizatorului (nu setarea programatică, ex. Reset)
+                    if (!fromUser) return
+                    currentBrightness = (progress / 1000f).coerceIn(0.15f, 1f)
                     listener?.onBrightnessChange(progress / 1000f)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar) {}
@@ -200,6 +284,10 @@ class SettingsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             thumbTintList = android.content.res.ColorStateList.valueOf(Color.rgb(255, 42, 61))
             setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                    // doar mișcările utilizatorului: altfel Reset (progress=1000) ar pune
+                    // volumul media al sistemului la maxim
+                    if (!fromUser) return
+                    currentVolume = (progress / 1000f).coerceIn(0f, 1f)
                     listener?.onVolumeChange(progress / 1000f)
                 }
                 override fun onStartTrackingTouch(sb: SeekBar) {}
