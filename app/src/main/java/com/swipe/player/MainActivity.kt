@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
     private var thumbAdapter: ThumbnailAdapter? = null
     private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val ascundeFotoCtrls = Runnable { ascundeControaleFoto() }
+    private val salveazaSetariDebounced = Runnable { salveazaSetarileCurente() }
     private lateinit var prefs: SharedPreferences
     private var volumCurent: Float = 1f
     private var luminozitateCurenta: Float = 1f
@@ -770,7 +771,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (::photoVolumeSeek.isInitialized) {
             photoVolumeSeek.progress = (volumCurent * 1000).toInt()
         }
-        salveazaSetarileCurente()
+        programeazaSalvareSetari()
     }
 
     private fun sincronizeazaLuminozitateDinSwipe(valoare: Float) {
@@ -779,7 +780,12 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (::photoBrightnessSeek.isInitialized) {
             photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         }
-        salveazaSetarileCurente()
+        programeazaSalvareSetari()
+    }
+
+    private fun programeazaSalvareSetari() {
+        uiHandler.removeCallbacks(salveazaSetariDebounced)
+        uiHandler.postDelayed(salveazaSetariDebounced, 200L)
     }
 
     private fun aplicaLumina(valoare: Float) {
@@ -811,6 +817,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         }
         // ecranul nu mai trebuie să rămână treaz forțat când app iese din prim-plan
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        uiHandler.removeCallbacks(salveazaSetariDebounced)
         salveazaSetarileCurente()
         salveazaStareSesiune() // nu pierdem poziția/modul la închidere
     }
@@ -848,6 +855,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
 
     override fun onDestroy() {
         super.onDestroy()
+        uiHandler.removeCallbacks(salveazaSetariDebounced)
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         salveazaSetarileCurente()
         // altfel rămâne un service orfan + notificare după închiderea aplicației
@@ -998,7 +1006,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
         if (::photoBrightnessSeek.isInitialized) {
             photoBrightnessSeek.progress = (luminozitateCurenta * 1000).toInt()
         }
-        salveazaSetarileCurente()
+        programeazaSalvareSetari()
     }
 
     override fun onVolumeChange(volume: Float) {
@@ -1014,7 +1022,7 @@ class MainActivity : AppCompatActivity(), SettingsBottomSheetDialogFragment.List
             Log.w(TAG, "Nu pot seta volumul media", e)
         }
         photoVolumeSeek.progress = (volumCurent * 1000).toInt()
-        salveazaSetarileCurente()
+        programeazaSalvareSetari()
     }
 
     override fun onResolutieChange(resolutionH: Int) {
